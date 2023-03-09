@@ -1,0 +1,274 @@
+import * as fs from "fs"
+import { Context, h, Logger, Random, Session } from "koishi"
+import path, { join } from "path"
+import { getPrefixReg } from "../module/coc"
+
+const debug = new Logger("debug")
+
+declare module 'koishi' {
+    interface Tables {
+        group_logging_v2: group_logging,
+        group_logging_data_v2: group_logging_data
+    }
+}
+
+// 当前群日志列表
+interface group_logging {
+    group_id: string,
+    log_name: string,
+    id: number,
+    last_call: Date,
+}
+
+interface group_logging_data {
+    id: number,
+    data_id: number,
+    // 消息的记录时间(时分秒)
+    date: Date,
+    // 来自谁，格式：（QQ）名称
+    from: string,
+    message: string
+}
+
+export default class group_log {
+    protected ctx: Context
+
+    constructor(ctx: Context) {
+        this.ctx = ctx
+
+        // 创建表
+        ctx.model.extend('group_logging_v2', {
+            group_id: 'string',
+            log_name: 'string',
+            last_call: 'date',
+            id: 'unsigned',
+        }, {
+            autoInc: true
+        })
+
+        ctx.model.extend('group_logging_data_v2', {
+            id: 'unsigned',
+            // link to logging-id
+            data_id: 'unsigned',
+            date: 'time',
+            from: 'string',
+            message: 'text'
+        }, {
+            autoInc: true
+        })
+    }
+}
+
+const log = new Logger("debug")
+
+// log new
+export async function log_new(ctx: Context, session: Session, name: any) {
+    if (!session.guildId)
+        return "本功能仅限群聊"
+    if (name.length == 0)
+        return "请输入log名称"
+
+    name = name.join(" ")
+
+    // 检测有否重名
+    if (await hvLog(ctx, session.guildId, name))
+        return "config.log.log_new_fail"
+    // 检测有否开始
+    if (await isLogging(ctx, session.guildId))
+        return "config.log.log_on_fail"
+
+    // 新建log
+    var log_id = await ctx.database.create('group_logging_v2', { group_id: session.guildId, log_name: name, last_call: new Date }).then(res => res.id)
+
+    keepLogging(ctx, session, name, log_id)
+
+    return "config.log.log_on"
+}
+
+// log off
+export async function log_off(ctx: Context, session: Session) {
+
+    if (isLogging(ctx, session.guildId)) {
+        await ctx.database.set('group_setting_v2', { group_id: session.guildId }, { 'logging': false })
+        return "config.log.log_off"
+    } else {
+        return "config.log.log_off_fail"
+    }
+}
+
+// log list
+export async function log_list(ctx: Context, session: Session) {
+    var log_name_lst = await ctx.database.get('group_logging_v2', { group_id: session.guildId }, ['log_name'])
+
+    if (log_name_lst.length == 0)
+        return "本群没有任何日志记录"
+
+    var log = await ctx.database.get('group_setting_v2', { group_id: session.guildId }, ['last_log'])
+        .then(res => res[0].last_log)
+
+    var said = "日志列表："
+
+    log_name_lst.forEach(e => {
+        said += "\n" + (e.log_name == log ? "★" : "") + e.log_name
+    })
+
+    said += "\n【★】= 最后使用的日志"
+
+    return said
+}
+
+// log on
+export async function log_on(ctx: Context, session: Session, name: any) {
+    if (!session.guildId)
+        return "本功能仅限群聊"
+    if (await isLogging(ctx, session.guildId))
+        return "config.log.log_on_fail"
+
+    var log_id: number
+
+    name = name.join(" ")
+
+    // name检查
+    if (name != "") {
+        // 有指定名称，先检查在不在
+        if (!await hvLog(ctx, session.guildId, name))
+            return "config.log.log_on_fail2"
+
+    } else {
+        // 无指定名称，获取上次
+        var prom = await ctx.database.get('group_setting_v2', { group_id: session.guildId }, ['last_log']).then(res => res)
+        // 上次也没有
+        if (prom.length < 0)
+            return "没有正在记录的log！请以log new 新建日志。"
+        else {
+            name = prom[0].last_log
+        }
+    }
+
+    // 从name获取log id
+    log_id = await ctx.database.get('group_logging_v2', { group_id: session.guildId, log_name: name }, ['id']).then(res => res[0].id)
+
+    keepLogging(ctx, session, name, log_id)
+
+    return "config.log.log_on"
+}
+
+// log end
+export async function log_end(ctx: Context, session: Session, name: any) {
+    if (!session.guildId)
+        return "本功能仅限群聊"
+
+    await ctx.database.set('group_setting_v2', { group_id: session.guildId }, { logging: false })
+
+    name = name.join(" ")
+
+    // name检查
+    if (name != "") {
+        // 有指定名称，先检查在不在
+        if (!await hvLog(ctx, session.guildId, name))
+            return "config.log.log_on_fail2"
+
+    } else {
+        // 无指定名称，获取上次
+        var prom_ = await ctx.database.get('group_setting_v2', { group_id: session.guildId }, ['last_log']).then(res => res)
+        // 上次也没有
+        if (prom_.length < 0)
+            return "没有正在使用的log！请以log new 新建日志。"
+        else {
+            name = prom_[0].last_log
+        }
+    }
+
+    // 从name获取log id
+    var log_id = await ctx.database.get('group_logging_v2', { group_id: session.guildId, log_name: name }, ['id']).then(res => res[0].id)
+
+    // 创建本地文件
+    const file_path = path.join(ctx.baseDir, "norn_logs", session.guildId)
+
+    if (!fs.existsSync(file_path)) {
+        fs.mkdirSync(file_path)
+    }
+
+    debug.info(file_path)
+
+    // 获取群正在编辑文件名称
+    var ws = fs.createWriteStream(path.join(file_path, name + ".txt"), { encoding: 'utf-8' })
+
+    session.send("正在生成文件...")
+
+    // 捞数据
+    var prom = await ctx.database.get('group_logging_data_v2', { data_id: log_id })
+
+    prom.forEach(e => {
+        ws.write(e.from + " " + e.date.getHours() + ":" + e.date.getMinutes() + ":" + e.date.getSeconds())
+        ws.write("\n" + e.message + "\n")
+    })
+
+    ws.end(async () => {
+        // await session.onebot.uploadGroupFile(session.guildId, path.join(file_path, name + ".txt"), name + ".txt")
+        //     .catch(err => {
+        //         debug.info(err)
+        //         session.send("文件上传失败！请联络骰主获得文件。\n若你是骰主，请联络开发者 蛇（1059648351）提供错误日志。")
+        //     })
+    })
+
+}
+
+// 有否指定log名称
+async function hvLog(ctx: Context, group_id: string, log_name: string) {
+    var prom = await ctx.database.get('group_logging_v2', { group_id: group_id, log_name: log_name })
+        .then(res => res.length)
+        .catch(err => 0)
+    return prom > 0
+}
+
+// 是否正在记录
+async function isLogging(ctx: Context, group_id: string) {
+    var logging = await ctx.database.get('group_setting_v2', { group_id: group_id }, ['logging'])
+        .then(res => res[0].logging)
+        .catch(async err => {
+            await ctx.database.create('group_setting_v2', { group_id: group_id, logging: false })
+            return false
+        })
+
+    return logging
+}
+
+// 开始记录
+async function keepLogging(ctx: Context, session: Session, log_name: string, log_id: number) {
+
+    var reg = getPrefixReg(ctx)
+
+    // 调整log状态
+    await ctx.database.set('group_setting_v2', { group_id: session.guildId }, { logging: true, last_log: log_name })
+
+    // 更新last call
+    await ctx.database.set('group_logging_v2', {id: log_id}, {last_call: new Date})
+
+    const sending = ctx.guild(session.guildId).on('before-send', (_) => {
+        ctx.database.create('group_logging_data_v2', { data_id: log_id, date: new Date, from: "(" + _.selfId + ")" + _.username, message: _.content })
+    })
+
+    const logging = ctx.guild(session.guildId).on('message', (_) => {
+        ctx.database.create('group_logging_data_v2', { data_id: log_id, date: new Date(), from: "(" + _.userId + ")" + _.username, message: _.content })
+
+        if (_.content.search(reg) != -1) {
+            if (_.content.replace(reg, "").match(/logoff|log off/)
+                || _.content.replace(reg, "").match(/logend|log end/)
+            ) {
+                sending()
+                logging()
+            }
+        }
+
+    })
+}
+
+// 制作log_id
+// function genKey(uid: string){
+//     var num = Random.int(uid.length)
+//     var date = new Date()
+//     var key = uid[num] + date.getTime()
+
+//     return key
+// }

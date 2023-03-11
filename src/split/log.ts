@@ -64,25 +64,25 @@ const log = new Logger("debug")
 // log new
 export async function log_new(ctx: Context, session: Session, name: any) {
     if (!session.guildId)
-        return "本功能仅限群聊"
+        return "Norn_Dice.Log.错误信息_群聊"
     if (name.length == 0)
-        return "请输入log名称"
+        return "Norn_Dice.Log.错误信息_无名"
 
     name = name.join(" ")
 
     // 检测有否重名
     if (await hvLog(ctx, session.guildId, name))
-        return "config.log.log_new_fail"
+        return "Norn_Dice.Log.错误信息_日志重名"
     // 检测有否开始
     if (await isLogging(ctx, session.guildId))
-        return "config.log.log_on_fail"
+        return "Norn_Dice.Log.错误信息_正在记录"
 
     // 新建log
     var log_id = await ctx.database.create('group_logging_v2', { group_id: session.guildId, log_name: name, last_call: new Date }).then(res => res.id)
 
     keepLogging(ctx, session, name, log_id)
 
-    return "config.log.log_on"
+    return "Norn_Dice.Log.开始记录"
 }
 
 // log off
@@ -90,9 +90,9 @@ export async function log_off(ctx: Context, session: Session) {
 
     if (isLogging(ctx, session.guildId)) {
         await ctx.database.set('group_setting_v2', { group_id: session.guildId }, { 'logging': false })
-        return "config.log.log_off"
+        return "Norn_Dice.Log.暂停记录"
     } else {
-        return "config.log.log_off_fail"
+        return "Norn_Dice.Log.暂停错误"
     }
 }
 
@@ -101,7 +101,7 @@ export async function log_list(ctx: Context, session: Session) {
     var log_name_lst = await ctx.database.get('group_logging_v2', { group_id: session.guildId }, ['log_name'])
 
     if (log_name_lst.length == 0)
-        return "本群没有任何日志记录"
+        return "Norn_Dice.Log.错误信息_没有日志"
 
     var log = await ctx.database.get('group_setting_v2', { group_id: session.guildId }, ['last_log'])
         .then(res => res[0].last_log)
@@ -120,9 +120,9 @@ export async function log_list(ctx: Context, session: Session) {
 // log on
 export async function log_on(ctx: Context, session: Session, name: any) {
     if (!session.guildId)
-        return "本功能仅限群聊"
+        return "Norn_Dice.Log.错误信息_群聊"
     if (await isLogging(ctx, session.guildId))
-        return "config.log.log_on_fail"
+        return "Norn_Dice.Log.错误信息_正在记录"
 
     var log_id: number
 
@@ -150,13 +150,13 @@ export async function log_on(ctx: Context, session: Session, name: any) {
 
     keepLogging(ctx, session, name, log_id)
 
-    return "config.log.log_on"
+    return "Norn_Dice.Log.继续记录"
 }
 
 // log end
 export async function log_end(ctx: Context, session: Session, name: any) {
     if (!session.guildId)
-        return "本功能仅限群聊"
+        return "Norn_Dice.Log.错误信息_群聊"
 
     await ctx.database.set('group_setting_v2', { group_id: session.guildId }, { logging: false })
 
@@ -166,7 +166,7 @@ export async function log_end(ctx: Context, session: Session, name: any) {
     if (name != "") {
         // 有指定名称，先检查在不在
         if (!await hvLog(ctx, session.guildId, name))
-            return "config.log.log_on_fail2"
+            return "Norn_Dice.Log.错误信息_没有文件"
 
     } else {
         // 无指定名称，获取上次
@@ -194,7 +194,7 @@ export async function log_end(ctx: Context, session: Session, name: any) {
     // 获取群正在编辑文件名称
     var ws = fs.createWriteStream(path.join(file_path, name + ".txt"), { encoding: 'utf-8' })
 
-    session.send("正在生成文件...")
+    session.send("Norn_Dice.Log.生成日志")
 
     // 捞数据
     var prom = await ctx.database.get('group_logging_data_v2', { data_id: log_id })
@@ -205,11 +205,11 @@ export async function log_end(ctx: Context, session: Session, name: any) {
     })
 
     ws.end(async () => {
-        // await session.onebot.uploadGroupFile(session.guildId, path.join(file_path, name + ".txt"), name + ".txt")
-        //     .catch(err => {
-        //         debug.info(err)
-        //         session.send("文件上传失败！请联络骰主获得文件。\n若你是骰主，请联络开发者 蛇（1059648351）提供错误日志。")
-        //     })
+        await session.onebot.uploadGroupFile(session.guildId, path.join(file_path, name + ".txt"), name + ".txt")
+            .catch(err => {
+                debug.info(err)
+                session.send("Norn_Dice.Log.错误信息_上传失败")
+            })
     })
 
 }

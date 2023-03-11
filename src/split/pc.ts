@@ -139,10 +139,9 @@ export async function pc_list(ctx: Context, session: Session) {
 }
 
 export async function pc_new(ctx: Context, session: Session, name: string) {
-    // var config = getConfig()
     // 没有名字
     if (!name) {
-        return "{'said':'请输入名字！'}"
+        return "Norn_Dice.人物卡.错误_空名"
 
     } else {
         // 加入数据库
@@ -154,13 +153,13 @@ export async function pc_new(ctx: Context, session: Session, name: string) {
                 await pc_tag(ctx, session, name).then(res => res)
 
                 var json = {}
-                json['said'] = 'config.pc.create_sence'
+                json['said'] = 'Norn_Dice.人物卡.创建角色卡'
                 json['name'] = name
                 return json
             })
             .catch(err => {
                 var json = {}
-                json['said'] = 'config.pc.create_error'
+                json['said'] = 'Norn_Dice.人物卡.错误_重名'
                 json['name'] = name
                 return json
             })
@@ -202,7 +201,7 @@ export async function pc_tag(ctx: Context, session: Session, name: string) {
             }
 
             var json = {}
-            json['said'] = 'config.pc.change_sence'
+            json['said'] = 'Norn_Dice.人物卡.切换角色卡'
             json['name'] = name
             return json
             // return "切换成功。\n当前人物卡：" + name
@@ -213,7 +212,7 @@ export async function pc_tag(ctx: Context, session: Session, name: string) {
 
 export async function pc_del(ctx: Context, session: Session, name: string) {
     if (!name) {
-        return JSON.stringify({ 'said': "请输入要删除的角色卡名称！" })
+        return "Norn_Dice.人物卡.错误_空名"
 
     } else if (name == "Default") {
         // 检查在不在
@@ -228,26 +227,30 @@ export async function pc_del(ctx: Context, session: Session, name: string) {
                     ctx.database.create('coc_pc_data_v2', { id: session.userId, name: 'Default', data: pc_default })
 
                 }
-                return JSON.stringify({ 'said': '已初始化默认角色卡' })
+                return "Norn_Dice.人物卡.初始化默认卡"
             })
 
     } else {
         // 从数据库删除
+        var json = {}
+        json['name'] = name
+
         var prom = await ctx.database.get('coc_pc_data_v2', { id: session.userId, name: name })
             .then(res => {
                 if (res.length == 0) {
-                    return "角色卡【" + name + "】不存在！"
+                    return "Norn_Dice.人物卡.错误_无卡"
 
                 } else {
                     ctx.database.remove('coc_pc_data_v2', { id: session.userId, name: name })
-                    return "已删除角色卡：\n" + name
+                    return "Norn_Dice.人物卡.删除角色卡"
                 }
             })
             .catch(err => {
                 return err + ""
             })
 
-        return JSON.stringify({ 'said': prom })
+        json['said'] = prom
+        return JSON.stringify(json)
     }
 }
 
@@ -255,12 +258,12 @@ export async function pc_nn(ctx: Context, session: Session, name: string) {
     // var config = getConfig()
 
     if (name == "Default")
-        return JSON.stringify({ 'said': "不能与默认卡同名！" })
+        return "Norn_Dice.人物卡.错误_重名"
 
     var prom = await getCard(ctx, session).then(res => res)
 
     if (name == undefined) {
-        return JSON.stringify({ 'said': "当前人物卡为：" + prom[0] })
+        return JSON.stringify({ 'said': "Norn_Dice.人物卡.查看当前卡", "name": prom[0] })
 
     } else {
         // 如果是默认卡
@@ -275,7 +278,7 @@ export async function pc_nn(ctx: Context, session: Session, name: string) {
                         await pc_del(ctx, session, "Default")
 
                         var json = {}
-                        json['said'] = "config.pc.rename_sence"
+                        json['said'] = "Norn_Dice.人物卡.重命名人物卡"
                         json['org'] = prom[0]
                         json['now'] = name
 
@@ -299,7 +302,6 @@ export async function pc_nn(ctx: Context, session: Session, name: string) {
         }
     }
 }
-
 
 // 获取当前卡：[name, json]
 export async function getCard(ctx: Context, session: Session) {
@@ -367,8 +369,9 @@ export async function st_show(ctx: Context, session: Session, name: string) {
 
     var json = {}
 
+    json['said'] = 'Norn_Dice.人物卡.查询技能结果'
+
     if (!name) {
-        json['said'] = 'config.pc.st_sence'
 
         var skill = ""
         var count = 0;
@@ -390,7 +393,6 @@ export async function st_show(ctx: Context, session: Session, name: string) {
         if (pc_skill_sugar[name] != undefined)
             name = pc_skill_sugar[name]
 
-        json['said'] = 'config.pc.st_sence'
         json['result'] = name + " => " + (prom[name] == undefined ? 0 : prom[name])
 
     }
@@ -403,7 +405,7 @@ export async function st_skill(ctx: Context, session: Session, skill: string) {
 
     // 技能走前头哦
     if (Number.parseInt(skill[0]) + "" != "NaN")
-        return JSON.stringify({ 'said': "指令错误！请使用 st 指令查看帮助示例。" })
+        return "指令错误！请使用 st 指令查看帮助示例。"
 
     // 获取当前卡
     var prom_ = await getCard(ctx, session)
@@ -483,16 +485,13 @@ export async function st_skill(ctx: Context, session: Session, skill: string) {
             if (said_v2 != "")
                 said_v2 += "\n"
 
-            said_v2 += e.name + ": " + (e.old == undefined ? 0 : e.old) + " =>" + e.now
+            said_v2 += e.name + ": " + (e.old == undefined ? 0 : e.old) + " => " + e.now
         });
     }
 
     var json = {}
-    json['said'] = 'config.pc.st_change'
+    json['said'] = 'Norn_Dice.人物卡.修改属性'
     json['result'] = said_v2
 
     return JSON.stringify(json)
-    // return JSON.parse(prom_)[1]["历史"]
-
-
 }

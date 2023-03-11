@@ -7,13 +7,13 @@ import PC, { pc_del, pc_list, pc_new, pc_nn, pc_tag, st_show, st_skill } from ".
 import { san_check } from "../split/sc";
 import { coc_chara, ti_li } from "../split/draw";
 import group_log, { log_end, log_list, log_new, log_off, log_on } from "../split/log";
-
+import { Config } from "../config/config";
 export const name = "coc"
 
 const log_catch = new Logger("")
 const debug = new Logger("debug")
 
-export function coc(ctx: Context) {
+export function coc(ctx: Context, config: Config) {
 
     // 前缀拼凑
     var reg = getPrefixReg(ctx)
@@ -56,7 +56,7 @@ export function coc(ctx: Context) {
 
             args[1] = args[1].trim()
 
-            _.send(await roll_check_bouns(r_check_bouns_punish(ctx, _, isBouns, ...args)))
+            _.send(await roll_check_bouns(r_check_bouns_punish(ctx, _, isBouns, ...args), _))
             return
         }
 
@@ -65,7 +65,7 @@ export function coc(ctx: Context) {
             var args = message.match(/^r[ac](.*)/)
             var args_ = args[1].split(" ")
 
-            _.send(await roll_check(r_c(ctx, _, ...args_)))
+            _.send(await roll_check(r_c(ctx, _, ...args_), _))
             return
         }
 
@@ -121,15 +121,6 @@ export function coc(ctx: Context) {
             return
         }
     })
-
-    // 
-    // 
-    // 创建Table
-    // 
-    // 
-    const trival = new group_set(ctx)
-    const pc = new PC(ctx)
-    const log = new group_log(ctx)
 
     // 
     // 
@@ -246,7 +237,7 @@ export function coc(ctx: Context) {
         .example('ra 80 侦查')
         .example('ra 3#斗殴')
 
-        .action((_, ...args) => roll_check(r_c(ctx, _.session, ...args)))
+        .action((_, ...args) => roll_check(r_c(ctx, _.session, ...args), _.session))
 
     ctx.command("r/rh [who: string]", "暗骰")
 
@@ -268,7 +259,7 @@ export function coc(ctx: Context) {
         .example('rab 2 侦查')
         .example('rab2 80 ')
 
-        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, true, ...args)))
+        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, true, ...args),_))
 
     ctx.command("r/rcp [...args]", '惩罚骰检定')
         .alias('rap')
@@ -281,7 +272,7 @@ export function coc(ctx: Context) {
         .example('rab 2 侦查')
         .example('rab2 80 ')
 
-        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, false, ...args)))
+        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, false, ...args),_))
 
     ctx.command("r/rb [num: number]", "奖励骰")
         .usage("在首次d100的基础上再投掷一次十位骰，并将两者对比后取较小的作为结果")
@@ -401,12 +392,12 @@ async function roll(prom) {
     var res = await prom.then(res => res)
 
     // 获取设置句子
-    var said = "config.roll"
+    var said = "Norn_Dice.投掷"
 
     // 判定有无投掷原因
     said += res.reason == "" ?
-        ".r_sence"
-        : ".r_sence_reasoned"
+        ".普通投掷"
+        : ".带理由的投掷"
 
     json['said'] = said
 
@@ -424,7 +415,6 @@ async function roll(prom) {
 
     // 替换详情
     if (res.middle.length <= 1) {
-        // said = said.replace("{resultDetail}", "")
         json['resultDetail'] = ""
 
     } else {
@@ -435,23 +425,19 @@ async function roll(prom) {
 
             arr += "[" + e.exp + "] = [" + e.res + "]"
         });
-        // said = said.replace("{resultDetail}", arr + "\n")
         json['resultDetail'] = arr + "\n"
     }
 
     json['result'] = res.result
     json['exp'] = res.exp
     json['reason'] = res.reason
-    // said = said.replace("{result}", res.result)
-    //             .replace("{exp}", res.exp)
-    //             .replace("{reason}", res.reason)
-
+    
     return JSON.stringify(json)
 
 }
 
 // 鉴定(rc)
-async function roll_check(prom) {
+async function roll_check(prom, session) {
 
     var json = {}
 
@@ -465,30 +451,17 @@ async function roll_check(prom) {
     var reason = res[1] == null ? "数值" : res[1]
     var target = res[2]
 
-    // 获取设置句子
-    // var said = JSON.parse(JSON.stringify(config.roll))
-
     // 单次检定
     if (roll_detail.length == 1) {
         // 句子尾
-        var said_v2 = 'config.roll.rc_sence_passLv["' + roll_detail[0]['passLv'] + '"]'
+        var said_v2 = 'Norn_Dice.投掷.技能检定.' + roll_detail[0]['passLv']
 
-        var said = 'config.roll.rc_sence'
-        // .replace("{reason}", reason)
-
-        // said_v2 = said_v2[roll_detail[0]['passLv']]
-        // .replace("{result}", "1d100 = " + roll_detail[0]["out"] + "/" + target)
-
-        said += "+" + said_v2
-
-        json['said'] = said
         json['reason'] = reason
         json['result'] = "1d100 = " + roll_detail[0]["out"] + "/" + target
 
-    } else {  //多次检定
-        var said = 'congif.roll.rc_sence_mult'
-        // .replace("{reason}", reason)
+        var said = session.text("Norn_Dice.投掷.普通检定", json) + session.text(said_v2)
 
+    } else {  //多次检定
         said_v2 = ""
 
         roll_detail.forEach(e => {
@@ -498,28 +471,23 @@ async function roll_check(prom) {
             said_v2 += e["out"] + "/" + target + " " + e["passLv"]
         });
 
-        // said = said.replace("{resultDetail}", said_v2)
-
-        json['said'] = said
         json['reason'] = reason
         json['resultDetail'] = said_v2
+
+        var said = session.text("Norn_Dice.投掷.多重检定", json)
     }
 
-    return JSON.stringify(json)
+    return said
 }
 
 // 检定奖励(rcb)
-async function roll_check_bouns(json_prom) {
-    // var config = getConfig()
-
+async function roll_check_bouns(json_prom, session) {
     var said_json = {}
 
     var json = await json_prom.then(res => res)
 
     if (json['bp'] == undefined)
         return json
-
-    var said = 'config.roll.r_check_bouns_sence'
 
     var bp = json.bp
 
@@ -536,13 +504,11 @@ async function roll_check_bouns(json_prom) {
     said_json['resultDetail'] = resultDetail
     said_json['result'] = bp.lastNum + "/" + json.target
 
-    var said_v2 = 'config.roll.rc_sence_passLv["' + json.passLv + '"]'
+    var said_v2 = 'Norn_Dice.投掷.技能检定.' + json.passLv
 
-    said += "+" + said_v2
+    var said = session.text("Norn_Dice.投掷.bp骰检定", said_json) + " " + session.text(said_v2)
 
-    said_json['said'] = said
-
-    return JSON.stringify(said_json)
+    return said
 }
 
 // 奖励/惩罚骰
@@ -550,7 +516,7 @@ function bouns_roll(res) {
     // var config = getConfig()
     var json = {}
 
-    var said = 'config.roll.r_bouns_sence'
+    var said = 'Norn_Dice.投掷.bp骰'
 
     var detail: string, exp: string
 

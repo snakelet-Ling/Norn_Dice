@@ -79,7 +79,7 @@ export async function r_c(ctx: Context, session: Session, ...args) {
 
     switch (args.length) {
         case 0:
-            return JSON.stringify({ 'said': "指令错误！请参阅 rc -h 指令。" })
+            return "指令错误！请参阅 rc -h 指令。"
             break;
 
         case 1:
@@ -109,7 +109,7 @@ export async function r_c(ctx: Context, session: Session, ...args) {
             break;
 
         default:
-            return JSON.stringify({ 'said': "指令错误！" })
+            return "指令错误！"
             break;
     }
 }
@@ -460,20 +460,16 @@ export async function rh(ctx: Context, session: Session, who?: string) {
 
     // 群聊限定
     if (session.guildId == undefined)
-        return JSON.stringify({ 'said': "本功能群聊限定" })
+        return "Norn_Dice.投掷.错误_群聊"
 
     var said = ""
 
     if (who == null) {
-        said = "config.roll.rh_sence"
-        // said = config["roll"]["rh_sence"]
+        said = "Norn_Dice.投掷.暗骰"
 
         // 单次投掷
         var result = await throw_roll(ctx, session, null)
             .then(res => res)
-
-        // said = said.replace("{groupID}", session.guildId)
-        //             .replace("{result}", result.exp + " = " + result.result)
 
         var json = {}
         json['said'] = said
@@ -485,8 +481,7 @@ export async function rh(ctx: Context, session: Session, who?: string) {
 
     } else {
         // 获得句子
-        said = "config.roll.rh_sence_reasoned"
-        // said = config["roll"]["rh_sence_reasoned"]
+        said = "Norn_Dice.投掷.暗骰但心理学检定"
 
         // 获得规则书
         var rules = await ctx.database.get('group_setting_v2', { group_id: (session.guildId == undefined ? personal + session.userId : session.guildId) }, ['setcoc'])
@@ -511,9 +506,6 @@ export async function rh(ctx: Context, session: Session, who?: string) {
 
         var resu = r_check(num, rules)
 
-        // said = said.replace("{pc_name}", nick)
-        //             .replace("{result}", "1d100 = " + resu[0][0]["out"] + "/" + num + " " + resu[0][0]["passLv"])
-
         var json = {}
         json['said'] = said
         json['pc_name'] = nick
@@ -523,13 +515,13 @@ export async function rh(ctx: Context, session: Session, who?: string) {
     }
 
     // 主群消息发送
-    return JSON.stringify({ 'said': "结果已发送" })
+    return "Norn_Dice.投掷.暗骰反馈"
 }
 
 // 奖励/惩罚检定
 export async function r_check_bouns_punish(ctx: Context, session: Session, isBouns: boolean, ...args) {
     if (args.length == 0)
-        return JSON.stringify({ 'said': "请输入检定参数！" })
+        return "Norn_Dice.投掷.错误_检定无参"
 
     // 一个奖励骰，参数是检定项目
     else if (args.length == 1 || Number.isNaN(Number(args[0]))) {

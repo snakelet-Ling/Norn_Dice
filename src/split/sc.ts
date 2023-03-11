@@ -4,12 +4,11 @@ import { isExpre, level_str, r_check, throw_roll } from "./roll"
 import { rules_get } from "./trivial"
 
 export async function san_check(ctx: Context, session: Session, ...args) {
-    // var config = getConfig()
 
     // 理智检测
     if (args.length == 2) {
         if (Number.isNaN(Number(args[0])))
-            return JSON.stringify({ 'said': "理智值输入无效！" })
+            return "Norn_Dice.投掷.理智检定.错误_理智值输入无效"
 
     } else {
         var prom = await getCard(ctx, session).then(res => res)
@@ -25,7 +24,7 @@ export async function san_check(ctx: Context, session: Session, ...args) {
     // 表达式检测
     var exp = JSON.stringify(args[1]).replace(/"/g, "").split("/")
     if (exp.length != 2)
-        return JSON.stringify({ 'said': "表达式有误，正确表述：[成功扣除]/[失败扣除]" })
+        return "Norn_Dice.投掷.理智检定.错误_表达式错误"
 
     // 都准备好了，开始施法
     var prom_ = await san_check_api(ctx, session, Number(args[0])).then(res => res[0][0])
@@ -33,16 +32,10 @@ export async function san_check(ctx: Context, session: Session, ...args) {
 
     let { out, passLv } = prom_
 
-    var said = "config.roll.sc_sence_passLv['sancheck']"
-    // var said = config.roll[""]['']
-    // said = said.replace("{player}", session.username)
-    json['player'] = session.username
-
-    var said_v2 = "config.roll.sc_sence_passLv['" + passLv + "']"
-    // var said_v2 = config.roll[""][passLv]
-    said += "+" + said_v2
-    // .replace("{result}", "1d100 = " + out + "/" + args[0])
+    json['player'] = prom[0]
     json['result'] = "1d100 = " + out + "/" + args[0]
+
+    var said = session.text("Norn_Dice.投掷.理智检定.sancheck", json) + session.text("Norn_Dice.投掷.理智检定." + passLv)
 
     // 先将成功失败都变成数字好了
     var exp_v2 = []
@@ -87,7 +80,6 @@ export async function san_check(ctx: Context, session: Session, ...args) {
         now = 0
     st_skill(ctx, session, "san" + now)
 
-    said_v2 = "config.roll.sc_sence_passLv['san_change']"
     // said_v2 = config.roll["sc_sence_passLv"]["san_change"]
     // said_v2 = said_v2.replace("{exp}", exp_str + " = " + sub_san)
     //                     .replace("{org}", args[0])
@@ -96,12 +88,11 @@ export async function san_check(ctx: Context, session: Session, ...args) {
     json['org'] = args[0]
     json['now'] = now
 
-    said += "+" + said_v2
+    said += session.text("Norn_Dice.投掷.理智检定.理智变化", json)
 
     // 查询精神状态
     if (now <= 0) {   // 疯了
-        said += "+config.roll.sc_sence_passLv['bye']"
-        // said += config.roll["sc_sence_passLv"]["bye"]
+        said += session.text("Norn_Dice.投掷.理智检定.永久疯狂")
 
     } else if (sub_san >= 5) { // 灵感检定的需要
         var prom = await getCard(ctx, session).then(res => res)
@@ -113,23 +104,21 @@ export async function san_check(ctx: Context, session: Session, ...args) {
         var prom_ = await san_check_api(ctx, session, int).then(res => res[0][0])
 
         let { out, passLv } = prom_
-        if (passLv == level_str.大失败 || passLv == level_str.失败)
-            // 战术性智障
-            said_v2 = "config.roll.sc_sence_passLv['no_insanity']"
-            // said_v2 = config.roll["sc_sence_passLv"]["no_insanity"]
-        else
-            // 恭喜你
-            said_v2 = "config.roll.sc_sence_passLv['insanity']"
-            // said_v2 = config.roll["sc_sence_passLv"]["insanity"]
-
-        // .replace("{intResult}", "1d100 = " + out + "/" + int)
         json['intResult'] = "1d100 = " + out + "/" + int
 
-        said += "+" + said_v2
+        if (passLv == level_str.大失败 || passLv == level_str.失败)
+            // 战术性智障
+            var said_v2 = session.text("Norn_Dice.投掷.理智检定.疯狂检定失败", json)
+
+        else
+            // 恭喜你
+            said_v2 = session.text("Norn_Dice.投掷.理智检定.临时疯狂", json)
+            
+
+        said += said_v2
     }
 
-    json['said'] = said
-    return JSON.stringify(json)
+    return said
 }
 
 // 链过去rc的函数

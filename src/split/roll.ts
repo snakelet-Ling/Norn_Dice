@@ -4,6 +4,8 @@ import { rules_get } from "./trivial"
 
 const personal = "personal"
 
+const debug = new Logger('debug')
+
 export const level_str = {
     '大失败': '大失败',
     '失败': '失败',
@@ -33,7 +35,7 @@ export async function throw_roll(ctx: Context, session: Session, ...args) {
 
     } else if (args.length == 1) {  // 1参，表达？理由？
         if (isExpre(args[0])) { // 表达式
-            var json = exp2postfix(args[0])
+            var json = exp2self(args[0])
             json.exp = args[0]
             return json
         } else {  // 理由
@@ -52,11 +54,11 @@ export async function throw_roll(ctx: Context, session: Session, ...args) {
     } else {  //否则 [0] = exp, [1] = reason
         var json = { middle: [], result: 0, reason: '', exp: '' }
         if (isExpre(args[0])) {
-            json = exp2postfix(args[0])
+            json = exp2self(args[0])
             json.reason = args[1]
             json.exp = args[0]
         } else {
-            json = exp2postfix(args[1])
+            json = exp2self(args[1])
             json.reason = args[0]
             json.exp = args[1]
         }
@@ -97,9 +99,15 @@ export async function r_c(ctx: Context, session: Session, ...args) {
         case 2:
             // 技能 or 数字 or 表达式 + 理由
             var res
+
             if (Number.isInteger(Number(args[0]))) {
                 res = r_check(Number(args[0]), rules)
                 res[1] = args[1]
+
+            } else if (Number.isInteger(Number(args[1]))) {
+                res = r_check(Number(args[1]), rules)
+                res[1] = args[0]
+
             } else {
                 res = r_check_exp(args[0], rules, ctx, session, args[1])
             }
@@ -115,8 +123,8 @@ export async function r_c(ctx: Context, session: Session, ...args) {
 }
 
 // 单次投掷
-function r_single(dice) {
-    return Random.int(1, dice)
+function r_single(dice: number) {
+    return Random.int(1, dice+1)
 }
 
 // 是否为骰点表达式
@@ -125,6 +133,42 @@ export function isExpre(expression) {
 
     // return expression
     return expression.indexOf("d") != -1
+}
+
+// 不拆后续表达，直接自套娃
+function exp2self(exp) {
+    // 先修正d\d+ - > 1d\d+
+    exp = exp.replace(/(\D+)(d\d+)/g, "$1" + "1$2")
+
+    var middle = []
+
+    var ex = exp.match(/(\d+)#(\d+)d(\d+)/)
+    while(ex != null){
+        var sum = 0
+        for(var i = 0; i < ex[1]; i++){
+            var res = r_mult(ex[2], ex[3])
+            middle.push(res[0])
+            sum += Number(res[1])
+        }
+
+        exp = exp.replace(ex[0], sum)
+
+        ex = exp.match(/(\d+)#(\d+)d(\d+)/)
+    }
+
+    var ex = exp.match(/(\d+)d(\d+)/)
+    while(ex != null){
+        var res = r_mult(ex[1], ex[2])
+        middle.push(res[0])
+
+        exp = exp.replace(ex[0], res[1])
+        
+        ex = exp.match(/(\d+)d(\d+)/)
+    }
+    
+    var said = { middle: middle, result: Number(eval(exp)), reason: '', exp: '' }
+    debug.info(said)
+    return said
 }
 
 // 拆成后缀表达式
@@ -287,7 +331,8 @@ function claPostfix(pos) {
         }
     }
 
-    return { middle: json, result: Number(eval(num.join("+"))), reason: "", exp: '' }
+    var said = { middle: json, result: Number(eval(num.join("+"))), reason: "", exp: '' }
+    return said
 }
 
 // 多次投掷
@@ -385,6 +430,7 @@ async function r_check_exp(exp: string, rules: any, ctx: Context, session: Sessi
 // 鉴定 [数字]: return [[{out: 出目， passLv: 成功等级}], 原因，目标]
 export function r_check(target: number, rules: any) {
     var out = r_single(100)
+
     var passLv = pass_check(rules, out, target)
 
     return [[{ 'out': out, 'passLv': passLv }], null, target]
@@ -444,9 +490,9 @@ function pass_check(rules: any, out: number, target: number) {
             break
 
         case '3':
-            if (out <= 5)
+            if (out <= 5 && out <= target)
                 level = level_str.大成功
-            else if (out >= 96)
+            else if (out >= 96 && out > target)
                 level = level_str.大失败
             break
     }

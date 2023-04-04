@@ -1,7 +1,9 @@
 import * as fs from "fs"
-import { Context, h, Logger, Random, Session } from "koishi"
-import path, { join } from "path"
+import { Context, Logger, Session } from "koishi"
+import path from "path"
 import { getPrefixReg } from "../module/coc"
+// import { Curl } from 'node-libcurl'
+// import axios from 'axios'
 
 const debug = new Logger("debug")
 
@@ -59,8 +61,6 @@ export default class group_log {
     }
 }
 
-const log = new Logger("debug")
-
 // log new
 export async function log_new(ctx: Context, session: Session, name: any) {
     if (!session.guildId)
@@ -88,10 +88,14 @@ export async function log_new(ctx: Context, session: Session, name: any) {
 // log off
 export async function log_off(ctx: Context, session: Session) {
 
-    if (isLogging(ctx, session.guildId)) {
+    if (await isLogging(ctx, session.guildId)) {
+        debug.info("log off")
+
         await ctx.database.set('group_setting_v2', { group_id: session.guildId }, { 'logging': false })
         return "Norn_Dice.Log.暂停记录"
     } else {
+        debug.info("log off err")
+
         return "Norn_Dice.Log.暂停错误"
     }
 }
@@ -185,11 +189,10 @@ export async function log_end(ctx: Context, session: Session, name: any) {
     // 创建本地文件
     const file_path = path.join(ctx.baseDir, "norn_logs", session.guildId)
 
+    // 创建位置
     if (!fs.existsSync(file_path)) {
-        fs.mkdirSync(file_path)
+        fs.mkdirSync(file_path, { recursive: true })
     }
-
-    debug.info(file_path)
 
     // 获取群正在编辑文件名称
     var ws = fs.createWriteStream(path.join(file_path, name + ".txt"), { encoding: 'utf-8' })
@@ -205,11 +208,76 @@ export async function log_end(ctx: Context, session: Session, name: any) {
     })
 
     ws.end(async () => {
+        var json = {}
+        // 群文件
         await session.onebot.uploadGroupFile(session.guildId, path.join(file_path, name + ".txt"), name + ".txt")
-            .catch(err => {
-                debug.info(err)
+            .catch(async err => {
                 session.send("Norn_Dice.Log.错误信息_上传失败")
+
+
+                var header = {}
+                var body = {}
+
+                // 定义文件
+                var file = fs.createReadStream(path.join(file_path, name + ".txt"))
+
+                header = {
+                    headers: {
+                        "Content-Type": "multipart/form-data"
+                    }
+                }
+                body = {
+                    'file': file
+                }
+
+                // anonfiles
+
+                debug.info("starting upload anonfiles...")
+                var prom = await ctx.http.post('https://api.anonfiles.com/upload?token=699f404b4a263a65',
+                    body,
+                    header)
+                    .then((res) => {
+                        debug.info("succ")
+
+                        json['said'] = "Norn_Dice.Log.上传到网络"
+                        json['url'] = res.data['data']['file']['url']['full']
+                        return true
+                    })
+                    .catch(async err => {
+                        debug.info("fail")
+
+                        debug.info("starting upload file.io...")
+
+                        // file.io
+                        await ctx.http.post('https://file.io/?expires=3d',
+                            body,
+                            header
+                        )
+                            .then((res) => {
+                                debug.info("succ")
+
+                                debug.info(res)
+
+                                json['said'] = "Norn_Dice.Log.上传到网络"
+                                json['url'] = res.link
+
+                            })
+                            .catch(err => {
+                                debug.info("fail")
+                                debug.info(err)
+
+                                json['said'] = "Norn_Dice.Log.错误信息_上传网盘失败"
+                            })
+                    })
+
             })
+            .finally(() => {
+                fs.rm(path.join(file_path, name + ".txt"),
+                    (err) => debug.info(err)
+                )
+                session.send(JSON.stringify(json))
+            })
+        // session.send(JSON.stringify(json))
     })
 
 }
@@ -225,7 +293,9 @@ async function hvLog(ctx: Context, group_id: string, log_name: string) {
 // 是否正在记录
 async function isLogging(ctx: Context, group_id: string) {
     var logging = await ctx.database.get('group_setting_v2', { group_id: group_id }, ['logging'])
-        .then(res => res[0].logging)
+        .then(res => {
+            return res[0].logging
+        })
         .catch(async err => {
             await ctx.database.create('group_setting_v2', { group_id: group_id, logging: false })
             return false
@@ -243,7 +313,7 @@ async function keepLogging(ctx: Context, session: Session, log_name: string, log
     await ctx.database.set('group_setting_v2', { group_id: session.guildId }, { logging: true, last_log: log_name })
 
     // 更新last call
-    await ctx.database.set('group_logging_v2', {id: log_id}, {last_call: new Date})
+    await ctx.database.set('group_logging_v2', { id: log_id }, { last_call: new Date })
 
     const sending = ctx.guild(session.guildId).on('before-send', (_) => {
         ctx.database.create('group_logging_data_v2', { data_id: log_id, date: new Date, from: "(" + _.selfId + ")" + _.username, message: _.content })

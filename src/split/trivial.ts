@@ -1,4 +1,4 @@
-import { Context, Logger, Session } from "koishi"
+import { Context, Session } from "koishi"
 import { getCard, pc_skill_sugar, st_skill } from "./pc"
 import { isExpre, level_str, r_check, throw_roll } from "./roll"
 
@@ -112,7 +112,7 @@ function isGroup(session: Session) {
 // 骰子开关
 export async function bot_off_on(ctx: Context, session: Session, isOn: boolean) {
     if (!isGroup(session))
-        return JSON.stringify({ 'said': '本指令仅群聊可用' })
+        return '本指令仅群聊可用'
 
     var prom = await ctx.database.get('group_setting_v2', { group_id: session.guildId })
         .then(res => {
@@ -123,17 +123,13 @@ export async function bot_off_on(ctx: Context, session: Session, isOn: boolean) 
             }
         })
 
-    var said = isOn ? 'config.bot.on_succ' : 'config.bot.off_succ'
+    var said = isOn ? 'Norn_Dice.骰子开关.成功开启' : 'Norn_Dice.骰子开关.成功关闭'
 
-    return JSON.stringify({ 'said': said })
+    return said
 }
-
-const debug = new Logger("debug")
 
 // 技能成长
 export async function en(ctx: Context, session: Session, ...args) {
-    debug.info(args)
-
     // 报错
     if (args.length == 0)
         return "Norn_Dice.投掷.成长检定.错误_缺参"

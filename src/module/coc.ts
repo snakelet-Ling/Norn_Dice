@@ -5,9 +5,10 @@ import { bouns_punish, rh, r_c, r_check_bouns_punish, throw_roll } from "../spli
 import group_set, { cocset, dface, en } from "../split/trivial";
 import PC, { pc_del, pc_list, pc_new, pc_nn, pc_tag, st_show, st_skill } from "../split/pc";
 import { san_check } from "../split/sc";
-import { coc_chara, ti_li } from "../split/draw";
+import { coc_chara, draw_name, ti_li } from "../split/draw";
 import group_log, { log_end, log_list, log_new, log_off, log_on } from "../split/log";
 import { Config } from "../config/config";
+import { isHidden } from "..";
 export const name = "coc"
 
 const log_catch = new Logger("")
@@ -18,15 +19,9 @@ export function coc(ctx: Context, config: Config) {
     // 前缀拼凑
     var reg = getPrefixReg(ctx)
 
-    // 整理帮助信息
-    ctx.command("clear", { hidden: true })
-    ctx.command("help", { hidden: true })
-    ctx.command("status", { hidden: true })
-    ctx.command("usage", { hidden: true })
-    ctx.command("timer", { hidden: true })
-
     // 日志 + 重定向
     ctx.on('message', async (_) => {
+
         // 日志输出
         log_catch.info((_.guildId == undefined ? "personal" : _.guildId) + " => " + _.username + "(" + _.userId + ") : \n" + _.content)
 
@@ -46,35 +41,53 @@ export function coc(ctx: Context, config: Config) {
         }
 
         // 正确指令不需要重定向的
-        if (message.match(/^rh ?$|^r[bp] |^r[bp]$|^r[ac] |^r[ac]$|^r[ac][pb] |^r[ac][bp]$|^sc /))
+        if (message.match(/^rh ?$|^r[bp] |^r[bp]$|^r[ac] |^r[ac]$|^r[ac][pb] |^r[ac][bp]$|^sc |^st show |^name /))
             return
 
         // rab/ rap
-        if (message.match(/^r[ac]([bp])(\d+)(.*)/)) {
-            var args = message.match(/^r[ac][bp](\d+)(.*)/)
+        if (message.match(/^r[ac]([bp])(.+)/)) {
+            var args = message.match(/^r[ac]([bp])(.+)/)
             var isBouns = args.shift().indexOf("b") != -1
 
             args[1] = args[1].trim()
 
-            _.send(await roll_check_bouns(r_check_bouns_punish(ctx, _, isBouns, ...args), _))
+            args_ = args[1].match(/^(\d*) *(.*)/)
+
+            _.send(await roll_check_bouns(r_check_bouns_punish(ctx, _, isBouns, args_[1], args_[2]), _))
             return
         }
 
         // ra
         if (message.match(/^r[ca](.+)/)) {
             var args = message.match(/^r[ac](.*)/)
-            var args_ = args[1].split(" ")
+            // var args_ = args[1].split(" ")
 
-            _.send(await roll_check(r_c(ctx, _, ...args_), _))
+            // 匹配 技能 + 数字
+            var args_ = args[1].match(/^(.*?)(\d*)$/)
+            // 匹配 数字 + 技能
+            if(args_[2] == ""){
+                args_ = args[1].match(/^(\d*)(.*)$/)
+            }
+
+            // 把整句先刷出去
+            args_.shift()
+            // 把空参数刷出去
+            var args__ = args_.filter((ele) => {return ele != ""})
+
+            _.send(await roll_check(r_c(ctx, _, ...args__), _))
             return
         }
 
         // rb/ rp
-        if (message.match(/^r[bp](\d+)/)) {
-            var args = message.match(/^r([bp])(\d+)/)
-            // _.send(JSON.stringify(args))
+        if (message.match(/^r[bp](.+)/)) {
+            var args = message.match(/^r([bp])(.+)/)
+            var isBouns = args.shift().indexOf("b") != -1
 
-            _.send(bouns_roll(bouns_punish(args[1] == "b", Number(args[2]))))
+            args[1] = args[1].trim()
+
+            args_ = args[1].match(/^(\d*)/)
+
+            _.send(bouns_roll(bouns_punish(isBouns, Number.isNaN(Number(args_[0]))? 1: Number(args_[0]))))
             return
         }
 
@@ -120,6 +133,19 @@ export function coc(ctx: Context, config: Config) {
             _.send(await dface(ctx, _, args[1]))
             return
         }
+
+        if(message.match(/^st show(.*)/)){
+            var args = message.match(/^st show(.*)/)
+            _.send(await st_show(ctx, _, args[1]))
+            return
+        }
+
+        // name
+        if (message.match(/^name(\S+)/)) {
+            var args = message.match(/^name(.*)/)
+            _.send(draw_name([args[1]]))
+            return
+        }
     })
 
     // 
@@ -127,10 +153,10 @@ export function coc(ctx: Context, config: Config) {
     // pc 指令
     // 
     // 
-    ctx.command("pc", "角色卡")
+    ctx.command("pc", "角色卡", {hidden: isHidden})
         .subcommand("st")
 
-    ctx.command("pc.list", "角色卡列表")
+    ctx.command("pc.list", "角色卡列表", {hidden: isHidden})
         .alias("pclist")
 
         .shortcut("pc list", { prefix: true })
@@ -138,7 +164,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action(({ session }) => pc_list(ctx, session))
 
-    ctx.command("pc.new [name: string]", "新建角色卡")
+    ctx.command("pc.new [name: string]", "新建角色卡", {hidden: isHidden})
         .alias("pcnew")
 
         .shortcut(/^pc new (.*)/, { args: ['$1'], prefix: true })
@@ -148,7 +174,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, name) => pc_new(ctx, _.session, name))
 
-    ctx.command("pc.del [name: string]", "删除角色卡")
+    ctx.command("pc.del [name: string]", "删除角色卡", {hidden: isHidden})
         .alias("pcdel")
 
         .shortcut(/^pc del (.*)/, { args: ['$1'], prefix: true })
@@ -159,14 +185,14 @@ export function coc(ctx: Context, config: Config) {
         .action((_, name) => pc_del(ctx, _.session, name))
 
 
-    ctx.command("pc/nn [name: string]", "重命名人物卡")
+    ctx.command("pc/nn [name: string]", "重命名人物卡", {hidden: isHidden})
         .usage("若当前使用默认卡则新建角色卡。\n参数留空为查看当前名称。\n")
 
         .example("nn snake")
 
         .action((_, name) => pc_nn(ctx, _.session, name))
 
-    ctx.command("pc.tag [name: string]", "切换角色卡")
+    ctx.command("pc.tag [name: string]", "切换角色卡", {hidden: isHidden})
         .alias("pctag")
 
         .shortcut(/^pc tag (.*)/, { args: ['$1'], prefix: true })
@@ -181,7 +207,7 @@ export function coc(ctx: Context, config: Config) {
     // st 指令
     // 
     // 
-    ctx.command("st [...args]", "技能属性录入")
+    ctx.command("pc/st [...args]", "技能属性录入", {hidden: isHidden})
 
         .shortcut(/^st ([\u4e00-\u9FA5a-zA-Z]+\d+)+/, { args: ["$1"], prefix: true })
 
@@ -194,14 +220,16 @@ export function coc(ctx: Context, config: Config) {
         .example("mp-3\n")
 
         .action((_, ...args) => {
-            if (args.length == 2 || args[0] == "show") {
+            if (args.length == 2 || args[0] == ("show")) {
                 return st_show(ctx, _.session, args[1])
+            } else if(args[0].match(/^show(.*)/)){
+                return
             } else {
                 return st_skill(ctx, _.session, args[0])
             }
         })
 
-    ctx.command("st.show [name: string]", "属性展示")
+    ctx.command("st.show [name: string]", "属性展示", {hidden: isHidden})
         .alias("stshow")
 
         .example("st show str")
@@ -214,7 +242,7 @@ export function coc(ctx: Context, config: Config) {
     // r 指令
     // 
     // 
-    ctx.command('r [...args]', "投掷指令")
+    ctx.command('r [...args]', "投掷指令", {hidden: isHidden})
 
         .option('exp', '表达式，默认1d100')
         .option('reason', '投掷原因')
@@ -224,7 +252,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, ...args) => roll(throw_roll(ctx, _.session, ...args)))
 
-    ctx.command('r/rc [...args]', "技能检定")
+    ctx.command('r/rc [...args]', "技能检定", {hidden: isHidden})
         .alias('ra')
 
         .option('value', '数值')
@@ -239,7 +267,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, ...args) => roll_check(r_c(ctx, _.session, ...args), _.session))
 
-    ctx.command("r/rh [who: string]", "暗骰")
+    ctx.command("r/rh [who: string]", "暗骰", {hidden: isHidden})
 
         .option('who', '艾特一个玩家以使用心理学鉴定')
 
@@ -248,7 +276,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, who) => rh(ctx, _.session, who))
 
-    ctx.command("r/rcb [...args]", '奖励骰检定')
+    ctx.command("r/rcb [...args]", '奖励骰检定', {hidden: isHidden})
         .alias('rab')
 
         .option('b', '奖励骰数量')
@@ -259,9 +287,9 @@ export function coc(ctx: Context, config: Config) {
         .example('rab 2 侦查')
         .example('rab2 80 ')
 
-        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, true, ...args),_))
+        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, true, ...args), _.session))
 
-    ctx.command("r/rcp [...args]", '惩罚骰检定')
+    ctx.command("r/rcp [...args]", '惩罚骰检定', {hidden: isHidden})
         .alias('rap')
 
         .option('b', '奖励骰数量')
@@ -272,19 +300,41 @@ export function coc(ctx: Context, config: Config) {
         .example('rab 2 侦查')
         .example('rab2 80 ')
 
-        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, false, ...args),_))
+        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, false, ...args), _.session))
 
-    ctx.command("r/rb [num: number]", "奖励骰")
+    ctx.command("r/rb", "奖励骰", {hidden: isHidden})
         .usage("在首次d100的基础上再投掷一次十位骰，并将两者对比后取较小的作为结果")
         .example("rb 3 => 三个奖励骰")
-        .action((_, num) => bouns_roll(bouns_punish(true, Number(num))))
+        .action((_, args) => {
+            if(args == undefined)
+                var num = 1
+            else{
+                var args_ = args[0].match(/^(\d+)/)
+                if(args_ == null)
+                    num = 1
+                else
+                    num = Number(args_[0])
+            }
+            return bouns_roll(bouns_punish(true, num))
+        })
 
-    ctx.command("r/rp [num: number]", "惩罚骰")
+    ctx.command("r/rp", "惩罚骰", {hidden: isHidden})
         .usage("在首次d100的基础上再投掷一次十位骰，并将两者对比后取较大的作为结果")
         .example("rp3 => 三个惩罚骰")
-        .action((_, num) => bouns_roll(bouns_punish(false, Number(num))))
+        .action((_, args) => {
+            if(args == undefined)
+                var num = 1
+            else{
+                var args_ = args[0].match(/^(\d+)/)
+                if(args_ == null)
+                    num = 1
+                else
+                    num = Number(args_[0])
+            }
+            return bouns_roll(bouns_punish(false, num))
+        })
 
-    ctx.command("sc [...args]", "理智检定")
+    ctx.command("sc [...args]", "理智检定", {hidden: isHidden})
 
         .option("san", "目前san值")
         .option("exp", "扣除表达式：[成功扣除]/[失败扣除]")
@@ -299,20 +349,20 @@ export function coc(ctx: Context, config: Config) {
     // 杂项
     // 
     // 
-    ctx.command("ti", "临时症状")
+    ctx.command("ti", "临时症状", {hidden: isHidden})
         .usage("临时疯狂 - 短期症状")
         .action(() => ti_li(true))
 
-    ctx.command("li", "总结症状")
+    ctx.command("li", "总结症状", {hidden: isHidden})
         .usage("临时疯狂 - 长期症状")
         .action(() => ti_li(false))
 
-    ctx.command("coc [num: number]", "COC人物作成")
+    ctx.command("coc [num: number]", "COC人物作成", {hidden: isHidden})
         .option('num', "生成数量，默认1")
 
         .action((_, num) => coc_chara(Number(num)))
 
-    ctx.command("en [...args]", "技能成长")
+    ctx.command("en [...args]", "技能成长", {hidden: isHidden})
         .option('skill', "技能")
         .option("exp", "成功增加")
         .option("exp2", "失败增加/成功增加")
@@ -322,7 +372,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, ...args) => en(ctx, _.session, ...args))
 
-    ctx.command('cocset [num: number]', "房规设置")
+    ctx.command('cocset [num: number]', "房规设置", {hidden: isHidden})
         .alias('setcoc [num: number]')
 
         .usage('参数1 => \n    1：大成功\n    技能数值小于50：96-100大失败\n    技能数值大于50：100大失败\n\n' +
@@ -332,18 +382,28 @@ export function coc(ctx: Context, config: Config) {
         .example("cocset 3")
         .action((_, num) => cocset(ctx, _.session, num))
 
-    ctx.command('set [num: number]', "骰面设置")
+    ctx.command('set [num: number]', "骰面设置", {hidden: isHidden})
         .option('face', "设置骰子默认面数，留空则默认百面骰")
 
         .example("set 20")
         .action((_, num) => dface(ctx, _.session, num))
+
+    ctx.command("name", {hidden: isHidden})
+        .option("area", "zh中文，jp日语，en英语")
+        .option("gender", "男/女（可选）")
+        .option("num", "数量，默认5")
+
+        .example("name jp 5")
+        .example("name")
+
+        .action((_, ...args) => draw_name(args))
 
     // 
     // 
     // log
     // 
     // 
-    ctx.command("log.new", "开新日志")
+    ctx.command("log.new", "开新日志", {hidden: isHidden})
         .shortcut(/^log new(.*)/, { prefix: true, args: ["$1"] })
         .shortcut(/^lognew(.*)/, { prefix: true, args: ["$1"] })
 
@@ -351,36 +411,33 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, ...args) => log_new(ctx, _.session, args))
 
-    ctx.command("log.off", "暂停日志")
+    ctx.command("log.off", "暂停日志", {hidden: isHidden})
         .shortcut(/^log off$/, { prefix: true })
         .shortcut(/^logoff$/, { prefix: true })
 
         .action((_) => log_off(ctx, _.session))
 
-    ctx.command("log.list", "日志列表")
+    ctx.command("log.list", "日志列表", {hidden: isHidden})
         .shortcut(/^log list$/, { prefix: true })
         .shortcut(/^loglist$/, { prefix: true })
 
         .action((_) => log_list(ctx, _.session))
 
-    ctx.command("log.on", "继续记录日志")
+    ctx.command("log.on", "继续记录日志", {hidden: isHidden})
         .shortcut(/^log on(.*)/, { prefix: true, args: ["$1"] })
         .shortcut(/^logon(.*)/, { prefix: true, args: ["$1"] })
 
         .action((_, ...args) => log_on(ctx, _.session, args))
 
-    ctx.command("log.end", "停止记录并输出文件")
+    ctx.command("log.end", "停止记录并输出文件", {hidden: isHidden})
         .shortcut(/^log end(.*)/, {prefix: true, args: ['$1']})
         .shortcut(/^logend(.*)/, {prefix: true, args: ['$1']})
 
         .action((_, ...args) => log_end(ctx, _.session, args))
 
-    // ctx.command("log.clr")
-    //     .action(async (_) => {
-    //         await ctx.database.remove('group_logging_v2', { group_id: _.session.guildId })
-    //         await ctx.database.remove('group_logging_data_v2', {id: {$gt: -1}})
-    //         return "done"
-    //     })
+    ctx.command("log.get", "获取本群日志", {hidden: isHidden})
+        .shortcut(/^log get(.*)/, {prefix: true, args: ['$1']})
+        .shortcut(/^logget(.*)/, {prefix: true, args: ['$1']})
 
 }
 

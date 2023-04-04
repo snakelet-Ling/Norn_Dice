@@ -258,12 +258,16 @@ export async function pc_nn(ctx: Context, session: Session, name: string) {
     // var config = getConfig()
 
     if (name == "Default")
-        return "Norn_Dice.人物卡.错误_重名"
+        return JSON.stringify({"said": "Norn_Dice.人物卡.错误_重名", "name": name})
 
     var prom = await getCard(ctx, session).then(res => res)
 
     if (name == undefined) {
         return JSON.stringify({ 'said': "Norn_Dice.人物卡.查看当前卡", "name": prom[0] })
+
+    } else if (name == prom[0]) {
+        // 已经是这张卡了！
+        return JSON.stringify({ 'said': "Norn_Dice.人物卡.切换角色卡", "name": prom[0] })
 
     } else {
         // 如果是默认卡

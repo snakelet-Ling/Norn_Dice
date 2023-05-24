@@ -124,7 +124,7 @@ export async function r_c(ctx: Context, session: Session, ...args) {
 
 // 单次投掷
 function r_single(dice: number) {
-    return Random.int(1, dice+1)
+    return Random.int(1, dice + 1)
 }
 
 // 是否为骰点表达式
@@ -132,20 +132,24 @@ export function isExpre(expression) {
     expression += ""
 
     // return expression
-    return expression.indexOf("d") != -1
+    return expression.match(/\d+[dD]\d+/) != null
 }
 
 // 不拆后续表达，直接自套娃
 function exp2self(exp) {
     // 先修正d\d+ - > 1d\d+
-    exp = exp.replace(/(\D+)(d\d+)/g, "$1" + "1$2")
+    // 1D10 -> 1d10
+    exp = exp.replace(/(\D+)[dD](\d+)/g, "$1" + "1d$2")
+        .replace(/(\d+)D(\d+)/g, "$1d$2")
+
+    debug.info(exp)
 
     var middle = []
 
     var ex = exp.match(/(\d+)#(\d+)d(\d+)/)
-    while(ex != null){
+    while (ex != null) {
         var sum = 0
-        for(var i = 0; i < ex[1]; i++){
+        for (var i = 0; i < ex[1]; i++) {
             var res = r_mult(ex[2], ex[3])
             middle.push(res[0])
             sum += Number(res[1])
@@ -157,181 +161,17 @@ function exp2self(exp) {
     }
 
     var ex = exp.match(/(\d+)d(\d+)/)
-    while(ex != null){
+    while (ex != null) {
         var res = r_mult(ex[1], ex[2])
         middle.push(res[0])
 
         exp = exp.replace(ex[0], res[1])
-        
+
         ex = exp.match(/(\d+)d(\d+)/)
     }
-    
+
     var said = { middle: middle, result: Number(eval(exp)), reason: '', exp: '' }
     debug.info(said)
-    return said
-}
-
-// 拆成后缀表达式
-function exp2postfix(exp) {
-
-    // 以d和符号为界
-    var regex = /[d\W]/
-
-    var str_arr = []
-
-    // 先拆成数组
-    while (exp.length > 0) {
-        if (exp.search(regex) == -1) {
-            str_arr.push(exp)
-            break
-        }
-
-        if (exp.search(regex) > 0)
-            str_arr.push(exp.substring(0, exp.search(regex)))
-        str_arr.push(exp.substring(exp.search(regex), exp.search(regex) + 1))
-
-        exp = exp.substring(exp.search(regex) + 1)
-
-    }
-
-    // 操作符
-    let op_arr_h = ["*", "/", "d", "#", '(', ')']
-    let op_arr_l = ['+', '-']
-
-    let op_arr = [...op_arr_h, ...op_arr_l]
-
-    // 数据表达式
-    var data_stack = []
-    // 操作符栈
-    var op_stack = []
-
-    var said = ""
-
-    str_arr.forEach((str, index) => {
-
-        said += "| " + op_stack.toString()
-
-        if (!op_arr.includes(str) && str != "") {
-            // 非操作符直接写上
-            data_stack.push(str)
-
-        } else {
-            // 操作符出入栈计算
-            if (str == '(' || op_stack.length == 0) {
-                // 左括，直接入栈
-                op_stack.push(str)
-
-            } else if (str == ')') {
-
-                // 右括，栈顶直出，直到左括抵消
-                var s = op_stack.shift()
-                while (s != '(') {
-                    data_stack.push(s)
-                    if (op_stack.length == 0)
-                        break
-                    s = op_stack.shift()
-                }
-
-            } else {
-                // 非括号，非空栈，计算优先级
-                var s = op_stack.shift()
-
-                if ((op_arr_h.includes(str) && op_arr_l.includes(s)) || s == "(") {
-                    // 高于，直接入栈
-                    op_stack.push(str)
-                    op_stack.push(s)
-
-                } else {
-                    // 不高于，栈顶输出，当前入栈
-                    data_stack.push(s)
-                    op_stack.push(str)
-                }
-
-            }
-        }
-
-    })
-
-    while (op_stack.length != 0) {
-        data_stack.push(op_stack.pop())
-    }
-
-    // return data_stack.toString()
-    return claPostfix(data_stack)
-}
-
-// 计算后缀表达式
-function claPostfix(pos) {
-
-    // return pos
-
-    // 存备用数字
-    var num = []
-
-    // 多次投掷记录出目
-    var json = []
-    // # 多少次
-    var sq = 1
-
-    while (pos.length > 0) {
-        var str = pos.shift()
-        switch (str) {
-            case '+':
-                var num2 = num.pop()
-                var num1 = num.pop()
-                num.push(Math.round(Number(num2) + Number(num1)))
-                break;
-
-            case '-':
-                var num2 = num.pop()
-                var num1 = num.pop()
-                num.push(Math.round(Number(num2) - Number(num1)))
-                break;
-
-            case '*':
-                var num2 = num.pop()
-                var num1 = num.pop()
-                num.push(Math.round(Number(num2) * Number(num1)))
-                break;
-
-            case '/':
-                var num2 = num.pop()
-                var num1 = num.pop()
-                num.push(Math.round(Number(num2) / Number(num1)))
-                break;
-
-            case 'd':
-                var num2 = num.pop()
-                var num1 = num.pop()
-
-                var sum = []
-
-                for (let i = 0; i < sq; i++) {
-                    str = r_mult(num1, num2)
-                    json.push(str[0])
-                    sum.push(Number(str[1]))
-                }
-                sq = 1
-
-                num.push(eval(sum.join("+")))
-
-                break;
-
-            case '#':
-                var num2 = num.pop()
-                sq = num.pop()
-
-                num.push(num2)
-
-                break;
-
-            default:
-                num.push(str)
-                break;
-        }
-    }
-
-    var said = { middle: json, result: Number(eval(num.join("+"))), reason: "", exp: '' }
     return said
 }
 

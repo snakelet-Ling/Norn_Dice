@@ -5,6 +5,7 @@ import scJson from "../json/sc.json"
 import name_en from "../json/name_en.json"
 import name_zh from "../json/name_zh.json"
 import name_jp from "../json/name_jp.json"
+import { getCard } from "./pc"
 
 export function ti_li(isTi: boolean) {
 
@@ -22,11 +23,11 @@ export function ti_li(isTi: boolean) {
     return JSON.stringify({ 'said': said })
 }
 
-export function coc_chara(num: number) {
+export async function coc_chara(session, num: number) {
     if (Number.isNaN(num))
         num = 1
 
-    var said = "{user}的七版COC人物作成："
+    var said = session.username + "的七版COC人物作成："
 
     for (let i = 0; i < num; i++) {
         // {力量,体质...}
@@ -65,8 +66,7 @@ export function coc_chara(num: number) {
         }
     }
 
-
-    return JSON.stringify({ 'said': said })
+    return said
 }
 
 // 名字

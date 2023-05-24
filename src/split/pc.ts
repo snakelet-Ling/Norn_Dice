@@ -380,12 +380,14 @@ export async function st_show(ctx: Context, session: Session, name: string) {
         var skill = ""
         var count = 0;
         for (const key in prom) {
-            if (skill != "")
-                skill += "\n"
-            skill += key + " => " + prom[key]
+            if(prom[key] <= 1)
+                continue
+            if (skill != "" && count != 0)
+                skill += " "
+            skill += key + prom[key]
             count++
-            if (count == 10) {
-                skill += "{SPLIT}"
+            if (count == 4) {
+                skill += "\n"
                 count = 0
             }
         }
@@ -397,7 +399,7 @@ export async function st_show(ctx: Context, session: Session, name: string) {
         if (pc_skill_sugar[name] != undefined)
             name = pc_skill_sugar[name]
 
-        json['result'] = name + " => " + (prom[name] == undefined ? 0 : prom[name])
+        json['result'] = name + " => " + (prom[name] == undefined ? 1 : prom[name])
 
     }
     return JSON.stringify(json)
@@ -423,7 +425,7 @@ export async function st_skill(ctx: Context, session: Session, skill: string) {
     var skill_change = []
 
     // 如果是运算
-    if (skill.search(/\+|-|\*|\//) != -1) {
+    if (skill.search(/\+|-|\*|\d+\/\d+/) != -1) {
         var ahi = skill.match(/(.*?)(\+|-|\*|\/)(.*)/)
 
         // 如果还有表达式
@@ -447,7 +449,8 @@ export async function st_skill(ctx: Context, session: Session, skill: string) {
 
     } else {
         // 分拆录入资料
-        var skill_group = skill.replace(/(\d+)/g, ",$1")
+        var skill_group = skill.replace(/(\D+)\/(\D+)(\d+)/,"$1$3$2$3")
+            .replace(/(\d+)/g, ",$1")
             .replace(/(\d+)(\D+)/g, "$1,$2")
 
         var skill_group_arr = skill_group.split(",")
@@ -473,9 +476,9 @@ export async function st_skill(ctx: Context, session: Session, skill: string) {
         }
     }
 
-    // 小于等于0的全吃了
+    // 小于等于1的全吃了
     for (let i = 0; i < prom[1].length; i++) {
-        if (Number(prom[1][i]) <= 0)
+        if (Number(prom[1][i]) <= 1)
             prom[1][i] = null
     }
 

@@ -1,14 +1,14 @@
-import { Context, Logger } from "koishi";
+import { Context, Logger, Session } from "koishi";
 
 import { } from '@koishijs/plugin-help'
-import { bouns_punish, rh, r_c, r_check_bouns_punish, throw_roll } from "../split/roll";
-import group_set, { cocset, dface, en } from "../split/trivial";
-import PC, { pc_del, pc_list, pc_new, pc_nn, pc_tag, st_show, st_skill } from "../split/pc";
+import { bouns_punish, rh, r_c, r_check_bouns_punish, throw_roll, isExpre } from "../split/roll";
+import group_set, { bot_off_on, cocset, dface, en } from "../split/trivial";
+import PC, { getCard, pc_del, pc_list, pc_new, pc_nn, pc_tag, st_show, st_skill } from "../split/pc";
 import { san_check } from "../split/sc";
 import { coc_chara, draw_name, ti_li } from "../split/draw";
 import group_log, { log_end, log_list, log_new, log_off, log_on } from "../split/log";
 import { Config } from "../config/config";
-import { isHidden } from "..";
+import { defaultOff, isHidden } from "..";
 export const name = "coc"
 
 const log_catch = new Logger("")
@@ -25,11 +25,34 @@ export function coc(ctx: Context, config: Config) {
         // 日志输出
         log_catch.info((_.guildId == undefined ? "personal" : _.guildId) + " => " + _.username + "(" + _.userId + ") : \n" + _.content)
 
-        var message = _.content
+        var message = ""
+
+        // 有艾特，不是自己，走
+        var ele = _.elements
+        if (ele.length > 1) {
+            if (ele[0].type == 'at' && ele[0].attrs.id != _.selfId)
+                return
+
+            message = ele[1].attrs.content.trim()
+
+        } else {
+            message = ele[0].attrs.content.trim()
+
+            // 检测关闭
+            if (!message.match(/^bot(on|off)/)) {
+                var prom = await ctx.database.get('group_setting_v2', { group_id: _.guildId }, ['bot_on'])
+                    .then(res => res.length == 0 ? defaultOff : res[0].bot_on)
+                    .catch(err => defaultOff)
+
+                if (!prom)
+                    return
+            }
+
+        }
 
         // 不包含前缀就不用快乐重定向了谢谢
         // 或者你这个参数是召唤帮助也不要乱来
-        if (message.search(reg) == -1 || _.content.indexOf("-h") != -1) {
+        if (message.search(reg) == -1 || message.indexOf("-h") != -1) {
             return
         } else {
             message = message.replace(reg, "")
@@ -41,7 +64,7 @@ export function coc(ctx: Context, config: Config) {
         }
 
         // 正确指令不需要重定向的
-        if (message.match(/^rh ?$|^r[bp] |^r[bp]$|^r[ac] |^r[ac]$|^r[ac][pb] |^r[ac][bp]$|^sc |^st show |^name /))
+        if (message.match(/^rh ?$|^r[bp] |^r[bp]$|^r[ac] |^r[ac]$|^r[ac][pb] |^r[ac][bp]$|^sc |^st show |^name |^bot /))
             return
 
         // rab/ rap
@@ -53,7 +76,7 @@ export function coc(ctx: Context, config: Config) {
 
             args_ = args[1].match(/^(\d*) *(.*)/)
 
-            _.send(await roll_check_bouns(r_check_bouns_punish(ctx, _, isBouns, args_[1], args_[2]), _))
+            _.send(await roll_check_bouns(ctx, r_check_bouns_punish(ctx, _, isBouns, args_[1], args_[2]), _))
             return
         }
 
@@ -65,16 +88,16 @@ export function coc(ctx: Context, config: Config) {
             // 匹配 技能 + 数字
             var args_ = args[1].match(/^(.*?)(\d*)$/)
             // 匹配 数字 + 技能
-            if(args_[2] == ""){
+            if (args_[2] == "") {
                 args_ = args[1].match(/^(\d*)(.*)$/)
             }
 
             // 把整句先刷出去
             args_.shift()
             // 把空参数刷出去
-            var args__ = args_.filter((ele) => {return ele != ""})
+            var args__ = args_.filter((ele) => { return ele != "" })
 
-            _.send(await roll_check(r_c(ctx, _, ...args__), _))
+            _.send(await roll_check(ctx, r_c(ctx, _, ...args__), _))
             return
         }
 
@@ -87,15 +110,18 @@ export function coc(ctx: Context, config: Config) {
 
             args_ = args[1].match(/^(\d*)/)
 
-            _.send(bouns_roll(bouns_punish(isBouns, Number.isNaN(Number(args_[0]))? 1: Number(args_[0]))))
+            _.send(await bouns_roll(ctx, _, bouns_punish(isBouns, Number.isNaN(Number(args_[0])) ? 1 : Number(args_[0]))))
             return
         }
 
         // r
         if (message.match(/^r(\S+)/)) {
             var args = message.match(/^r(.*)/)
+            if (!isExpre(args[1]))
+                return
+
             var args_arr = args[1].replace(/  /g, " ").split(" ")
-            _.send(await roll(throw_roll(ctx, _, ...args_arr)).then(res => res))
+            _.send(await roll(ctx, _, throw_roll(ctx, _, ...args_arr)).then(res => res))
             return
         }
 
@@ -134,7 +160,7 @@ export function coc(ctx: Context, config: Config) {
             return
         }
 
-        if(message.match(/^st show(.*)/)){
+        if (message.match(/^st show(.*)/)) {
             var args = message.match(/^st show(.*)/)
             _.send(await st_show(ctx, _, args[1]))
             return
@@ -146,6 +172,13 @@ export function coc(ctx: Context, config: Config) {
             _.send(draw_name([args[1]]))
             return
         }
+
+        // bot off/on
+        if (message.match(/^bot(on|off)/)) {
+            var args = message.match(/^bot(on|off)/)
+            _.send(await bot_off_on(ctx, _, args[1] == "on"))
+            return
+        }
     })
 
     // 
@@ -153,10 +186,10 @@ export function coc(ctx: Context, config: Config) {
     // pc 指令
     // 
     // 
-    ctx.command("pc", "角色卡", {hidden: isHidden})
+    ctx.command("pc", "角色卡", { hidden: isHidden })
         .subcommand("st")
 
-    ctx.command("pc.list", "角色卡列表", {hidden: isHidden})
+    ctx.command("pc.list", "角色卡列表", { hidden: isHidden })
         .alias("pclist")
 
         .shortcut("pc list", { prefix: true })
@@ -164,7 +197,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action(({ session }) => pc_list(ctx, session))
 
-    ctx.command("pc.new [name: string]", "新建角色卡", {hidden: isHidden})
+    ctx.command("pc.new [name: string]", "新建角色卡", { hidden: isHidden })
         .alias("pcnew")
 
         .shortcut(/^pc new (.*)/, { args: ['$1'], prefix: true })
@@ -174,7 +207,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, name) => pc_new(ctx, _.session, name))
 
-    ctx.command("pc.del [name: string]", "删除角色卡", {hidden: isHidden})
+    ctx.command("pc.del [name: string]", "删除角色卡", { hidden: isHidden })
         .alias("pcdel")
 
         .shortcut(/^pc del (.*)/, { args: ['$1'], prefix: true })
@@ -185,14 +218,14 @@ export function coc(ctx: Context, config: Config) {
         .action((_, name) => pc_del(ctx, _.session, name))
 
 
-    ctx.command("pc/nn [name: string]", "重命名人物卡", {hidden: isHidden})
+    ctx.command("pc/nn [name: string]", "重命名人物卡", { hidden: isHidden })
         .usage("若当前使用默认卡则新建角色卡。\n参数留空为查看当前名称。\n")
 
         .example("nn snake")
 
         .action((_, name) => pc_nn(ctx, _.session, name))
 
-    ctx.command("pc.tag [name: string]", "切换角色卡", {hidden: isHidden})
+    ctx.command("pc.tag [name: string]", "切换角色卡", { hidden: isHidden })
         .alias("pctag")
 
         .shortcut(/^pc tag (.*)/, { args: ['$1'], prefix: true })
@@ -207,7 +240,7 @@ export function coc(ctx: Context, config: Config) {
     // st 指令
     // 
     // 
-    ctx.command("pc/st [...args]", "技能属性录入", {hidden: isHidden})
+    ctx.command("pc/st [...args]", "技能属性录入", { hidden: isHidden })
 
         .shortcut(/^st ([\u4e00-\u9FA5a-zA-Z]+\d+)+/, { args: ["$1"], prefix: true })
 
@@ -222,14 +255,14 @@ export function coc(ctx: Context, config: Config) {
         .action((_, ...args) => {
             if (args.length == 2 || args[0] == ("show")) {
                 return st_show(ctx, _.session, args[1])
-            } else if(args[0].match(/^show(.*)/)){
+            } else if (args[0].match(/^show(.*)/)) {
                 return
             } else {
                 return st_skill(ctx, _.session, args[0])
             }
         })
 
-    ctx.command("st.show [name: string]", "属性展示", {hidden: isHidden})
+    ctx.command("st.show [name: string]", "属性展示", { hidden: isHidden })
         .alias("stshow")
 
         .example("st show str")
@@ -242,7 +275,7 @@ export function coc(ctx: Context, config: Config) {
     // r 指令
     // 
     // 
-    ctx.command('r [...args]', "投掷指令", {hidden: isHidden})
+    ctx.command('r [...args]', "投掷指令", { hidden: isHidden })
 
         .option('exp', '表达式，默认1d100')
         .option('reason', '投掷原因')
@@ -250,9 +283,9 @@ export function coc(ctx: Context, config: Config) {
         .example('r 3d6*5 力量')
         .example('r 3#1d50+2')
 
-        .action((_, ...args) => roll(throw_roll(ctx, _.session, ...args)))
+        .action((_, ...args) => roll(ctx, _.session, throw_roll(ctx, _.session, ...args)))
 
-    ctx.command('r/rc [...args]', "技能检定", {hidden: isHidden})
+    ctx.command('r/rc [...args]', "技能检定", { hidden: isHidden })
         .alias('ra')
 
         .option('value', '数值')
@@ -265,9 +298,9 @@ export function coc(ctx: Context, config: Config) {
         .example('ra 80 侦查')
         .example('ra 3#斗殴')
 
-        .action((_, ...args) => roll_check(r_c(ctx, _.session, ...args), _.session))
+        .action((_, ...args) => roll_check(ctx, r_c(ctx, _.session, ...args), _.session))
 
-    ctx.command("r/rh [who: string]", "暗骰", {hidden: isHidden})
+    ctx.command("r/rh [who: string]", "暗骰", { hidden: isHidden })
 
         .option('who', '艾特一个玩家以使用心理学鉴定')
 
@@ -276,7 +309,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, who) => rh(ctx, _.session, who))
 
-    ctx.command("r/rcb [...args]", '奖励骰检定', {hidden: isHidden})
+    ctx.command("r/rcb [...args]", '奖励骰检定', { hidden: isHidden })
         .alias('rab')
 
         .option('b', '奖励骰数量')
@@ -287,9 +320,9 @@ export function coc(ctx: Context, config: Config) {
         .example('rab 2 侦查')
         .example('rab2 80 ')
 
-        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, true, ...args), _.session))
+        .action((_, ...args) => roll_check_bouns(ctx, r_check_bouns_punish(ctx, _.session, true, ...args), _.session))
 
-    ctx.command("r/rcp [...args]", '惩罚骰检定', {hidden: isHidden})
+    ctx.command("r/rcp [...args]", '惩罚骰检定', { hidden: isHidden })
         .alias('rap')
 
         .option('b', '奖励骰数量')
@@ -300,41 +333,41 @@ export function coc(ctx: Context, config: Config) {
         .example('rab 2 侦查')
         .example('rab2 80 ')
 
-        .action((_, ...args) => roll_check_bouns(r_check_bouns_punish(ctx, _.session, false, ...args), _.session))
+        .action((_, ...args) => roll_check_bouns(ctx, r_check_bouns_punish(ctx, _.session, false, ...args), _.session))
 
-    ctx.command("r/rb", "奖励骰", {hidden: isHidden})
+    ctx.command("r/rb", "奖励骰", { hidden: isHidden })
         .usage("在首次d100的基础上再投掷一次十位骰，并将两者对比后取较小的作为结果")
         .example("rb 3 => 三个奖励骰")
         .action((_, args) => {
-            if(args == undefined)
+            if (args == undefined)
                 var num = 1
-            else{
+            else {
                 var args_ = args[0].match(/^(\d+)/)
-                if(args_ == null)
+                if (args_ == null)
                     num = 1
                 else
                     num = Number(args_[0])
             }
-            return bouns_roll(bouns_punish(true, num))
+            return bouns_roll(ctx, _.session, bouns_punish(true, num))
         })
 
-    ctx.command("r/rp", "惩罚骰", {hidden: isHidden})
+    ctx.command("r/rp", "惩罚骰", { hidden: isHidden })
         .usage("在首次d100的基础上再投掷一次十位骰，并将两者对比后取较大的作为结果")
         .example("rp3 => 三个惩罚骰")
         .action((_, args) => {
-            if(args == undefined)
+            if (args == undefined)
                 var num = 1
-            else{
+            else {
                 var args_ = args[0].match(/^(\d+)/)
-                if(args_ == null)
+                if (args_ == null)
                     num = 1
                 else
                     num = Number(args_[0])
             }
-            return bouns_roll(bouns_punish(false, num))
+            return bouns_roll(ctx, _.session, bouns_punish(false, num))
         })
 
-    ctx.command("sc [...args]", "理智检定", {hidden: isHidden})
+    ctx.command("sc [...args]", "理智检定", { hidden: isHidden })
 
         .option("san", "目前san值")
         .option("exp", "扣除表达式：[成功扣除]/[失败扣除]")
@@ -349,20 +382,20 @@ export function coc(ctx: Context, config: Config) {
     // 杂项
     // 
     // 
-    ctx.command("ti", "临时症状", {hidden: isHidden})
+    ctx.command("ti", "临时症状", { hidden: isHidden })
         .usage("临时疯狂 - 短期症状")
         .action(() => ti_li(true))
 
-    ctx.command("li", "总结症状", {hidden: isHidden})
+    ctx.command("li", "总结症状", { hidden: isHidden })
         .usage("临时疯狂 - 长期症状")
         .action(() => ti_li(false))
 
-    ctx.command("coc [num: number]", "COC人物作成", {hidden: isHidden})
+    ctx.command("coc [num: number]", "COC人物作成", { hidden: isHidden })
         .option('num', "生成数量，默认1")
 
-        .action((_, num) => coc_chara(Number(num)))
+        .action(async (_, num) => await coc_chara(_.session, Number(num)).then(res => res))
 
-    ctx.command("en [...args]", "技能成长", {hidden: isHidden})
+    ctx.command("en [...args]", "技能成长", { hidden: isHidden })
         .option('skill', "技能")
         .option("exp", "成功增加")
         .option("exp2", "失败增加/成功增加")
@@ -372,7 +405,7 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, ...args) => en(ctx, _.session, ...args))
 
-    ctx.command('cocset [num: number]', "房规设置", {hidden: isHidden})
+    ctx.command('cocset [num: number]', "房规设置", { hidden: isHidden })
         .alias('setcoc [num: number]')
 
         .usage('参数1 => \n    1：大成功\n    技能数值小于50：96-100大失败\n    技能数值大于50：100大失败\n\n' +
@@ -382,13 +415,13 @@ export function coc(ctx: Context, config: Config) {
         .example("cocset 3")
         .action((_, num) => cocset(ctx, _.session, num))
 
-    ctx.command('set [num: number]', "骰面设置", {hidden: isHidden})
+    ctx.command('set [num: number]', "骰面设置", { hidden: isHidden })
         .option('face', "设置骰子默认面数，留空则默认百面骰")
 
         .example("set 20")
         .action((_, num) => dface(ctx, _.session, num))
 
-    ctx.command("name", {hidden: isHidden})
+    ctx.command("name", { hidden: isHidden })
         .option("area", "zh中文，jp日语，en英语")
         .option("gender", "男/女（可选）")
         .option("num", "数量，默认5")
@@ -403,7 +436,7 @@ export function coc(ctx: Context, config: Config) {
     // log
     // 
     // 
-    ctx.command("log.new", "开新日志", {hidden: isHidden})
+    ctx.command("log.new", "开新日志", { hidden: isHidden })
         .shortcut(/^log new(.*)/, { prefix: true, args: ["$1"] })
         .shortcut(/^lognew(.*)/, { prefix: true, args: ["$1"] })
 
@@ -411,38 +444,38 @@ export function coc(ctx: Context, config: Config) {
 
         .action((_, ...args) => log_new(ctx, _.session, args))
 
-    ctx.command("log.off", "暂停日志", {hidden: isHidden})
+    ctx.command("log.off", "暂停日志", { hidden: isHidden })
         .shortcut(/^log off$/, { prefix: true })
         .shortcut(/^logoff$/, { prefix: true })
 
         .action((_) => log_off(ctx, _.session))
 
-    ctx.command("log.list", "日志列表", {hidden: isHidden})
+    ctx.command("log.list", "日志列表", { hidden: isHidden })
         .shortcut(/^log list$/, { prefix: true })
         .shortcut(/^loglist$/, { prefix: true })
 
         .action((_) => log_list(ctx, _.session))
 
-    ctx.command("log.on", "继续记录日志", {hidden: isHidden})
+    ctx.command("log.on", "继续记录日志", { hidden: isHidden })
         .shortcut(/^log on(.*)/, { prefix: true, args: ["$1"] })
         .shortcut(/^logon(.*)/, { prefix: true, args: ["$1"] })
 
         .action((_, ...args) => log_on(ctx, _.session, args))
 
-    ctx.command("log.end", "停止记录并输出文件", {hidden: isHidden})
-        .shortcut(/^log end(.*)/, {prefix: true, args: ['$1']})
-        .shortcut(/^logend(.*)/, {prefix: true, args: ['$1']})
+    ctx.command("log.end", "停止记录并输出文件", { hidden: isHidden })
+        .shortcut(/^log end(.*)/, { prefix: true, args: ['$1'] })
+        .shortcut(/^logend(.*)/, { prefix: true, args: ['$1'] })
 
         .action((_, ...args) => log_end(ctx, _.session, args))
 
-    ctx.command("log.get", "获取本群日志", {hidden: isHidden})
-        .shortcut(/^log get(.*)/, {prefix: true, args: ['$1']})
-        .shortcut(/^logget(.*)/, {prefix: true, args: ['$1']})
+    ctx.command("log.get", "获取本群日志", { hidden: isHidden })
+        .shortcut(/^log get(.*)/, { prefix: true, args: ['$1'] })
+        .shortcut(/^logget(.*)/, { prefix: true, args: ['$1'] })
 
 }
 
 // 投掷
-async function roll(prom) {
+async function roll(ctx: Context, session: Session, prom) {
 
     var json = {}
 
@@ -488,15 +521,21 @@ async function roll(prom) {
     json['result'] = res.result
     json['exp'] = res.exp
     json['reason'] = res.reason
-    
+
+    json['player'] = await getCard(ctx, session).then(res => res[0] + "")
+    json['user'] = session.username
+
     return JSON.stringify(json)
 
 }
 
 // 鉴定(rc)
-async function roll_check(prom, session) {
+async function roll_check(ctx: Context, prom, session: Session) {
 
     var json = {}
+
+    json['player'] = await getCard(ctx, session).then(res => res[0] + "")
+    json['user'] = session.username
 
     // 提取内容
     var res = await prom.then(res => res)
@@ -538,7 +577,7 @@ async function roll_check(prom, session) {
 }
 
 // 检定奖励(rcb)
-async function roll_check_bouns(json_prom, session) {
+async function roll_check_bouns(ctx: Context, json_prom, session: Session) {
     var said_json = {}
 
     var json = await json_prom.then(res => res)
@@ -561,6 +600,9 @@ async function roll_check_bouns(json_prom, session) {
     said_json['resultDetail'] = resultDetail
     said_json['result'] = bp.lastNum + "/" + json.target
 
+    said_json['player'] = await getCard(ctx, session).then(res => res[0] + "")
+    said_json['user'] = session.username
+
     var said_v2 = 'Norn_Dice.投掷.技能检定.' + json.passLv
 
     var said = session.text("Norn_Dice.投掷.bp骰检定", said_json) + " " + session.text(said_v2)
@@ -569,7 +611,7 @@ async function roll_check_bouns(json_prom, session) {
 }
 
 // 奖励/惩罚骰
-function bouns_roll(res) {
+async function bouns_roll(ctx: Context, session: Session, res) {
     // var config = getConfig()
     var json = {}
 
@@ -590,9 +632,8 @@ function bouns_roll(res) {
     json['exp'] = exp
     json['result'] = res['lastNum']
 
-    // said = said.replace("{resultDetail}", detail)
-    //             .replace("{exp}", exp)
-    //             .replace("{result}", res['lastNum'])
+    json['player'] = await getCard(ctx, session).then(res => res[0] + "")
+    json['user'] = session.username
 
     return JSON.stringify(json)
 }

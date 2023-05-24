@@ -127,6 +127,11 @@ export async function log_on(ctx: Context, session: Session, name: any) {
         return "Norn_Dice.Log.错误信息_群聊"
     if (await isLogging(ctx, session.guildId))
         return "Norn_Dice.Log.错误信息_正在记录"
+        
+    var log_name_lst = await ctx.database.get('group_logging_v2', { group_id: session.guildId }, ['log_name'])
+
+    if (log_name_lst.length == 0)
+        return "Norn_Dice.Log.错误信息_没有日志"
 
     var log_id: number
 
@@ -333,12 +338,3 @@ async function keepLogging(ctx: Context, session: Session, log_name: string, log
 
     })
 }
-
-// 制作log_id
-// function genKey(uid: string){
-//     var num = Random.int(uid.length)
-//     var date = new Date()
-//     var key = uid[num] + date.getTime()
-
-//     return key
-// }

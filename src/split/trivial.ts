@@ -43,6 +43,7 @@ export default class group_set {
 
 const personal = "personal"
 
+// 获取当前房规
 export async function rules_get(ctx: Context, session: Session) {
     var rules = await ctx.database.get('group_setting_v2', { group_id: (session.guildId == undefined ? personal + session.userId : session.guildId) }, ['setcoc'])
         .then(res => {

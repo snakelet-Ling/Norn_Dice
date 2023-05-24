@@ -13,12 +13,15 @@ export { Config }
 
 const log_send = new Logger("Bot：")
 const debug = new Logger("debug")
+const version = "0.2.19"
 
 export let isHidden = false
+export let defaultOff = false
 
 export function apply(ctx: Context, config: Config) {
 
   isHidden = config.hidden_command
+  defaultOff = config.open_default
 
   ctx.plugin(coc)
   ctx.i18n.define("zh", require('./locales/zh'))
@@ -58,12 +61,8 @@ export function apply(ctx: Context, config: Config) {
 
     _.content = _.text(json.said, json)
 
-    var player = await getCard(ctx, _).then(res => res[0] + "")
-
     _.content
       = _.content
-        .replace(/{player}/g, player)
-        .replace(/{user}/g, _.username)
         .replace(/&gt;;|&amp;gt;/g, ">")
         .replace(/\\n/g, "\n")
 
@@ -145,14 +144,19 @@ export function apply(ctx: Context, config: Config) {
     var ele = argv.session.elements[0]
 
     // 不是艾特自己直接走
-    if (ele.type == 'at' && ele.attrs.id != argv.session.selfId)
-      return ''
+    if (ele.type == 'at') {
+      if (ele.attrs.id != argv.session.selfId)
+        return ''
+      else
+        return
+    }
 
 
     // 私聊不管 || bot on 指令不管 || 不是艾特自己也不管
     if (argv.session.guildId == undefined ||
       argv.command.displayName == 'bot' ||
-      argv.command.displayName.match(/^bot.*[on|off]/))
+      argv.command.displayName.match(/^bot.*[on|off]/) ||
+      argv.command.displayName == "dismiss")
       return
 
     else {
@@ -173,7 +177,7 @@ export function apply(ctx: Context, config: Config) {
       else if (args == "on")
         return bot_off_on(ctx, _.session, true)
       else
-        return "Norn Dice. v0.2.3\n" + _.session.text("Norn_Dice.骰子信息", { 'SPLIT': "{SPLIT}" })
+        return "Norn Dice. v" + version + "\n" + _.session.text("Norn_Dice.骰子信息", { 'SPLIT': "{SPLIT}" })
     })
 
   ctx.command('bot.off', "关闭骰子功能", { hidden: isHidden })

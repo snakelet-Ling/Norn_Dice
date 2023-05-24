@@ -302,6 +302,8 @@ export async function pc_nn(ctx: Context, session: Session, name: string) {
             await pc_del(ctx, session, prom[0] + "")
             var prom_ = await pc_tag(ctx, session, name).then(res => res)
 
+            prom_['said'] = "Norn_Dice.人物卡.重命名人物卡"
+            
             return prom_
         }
     }

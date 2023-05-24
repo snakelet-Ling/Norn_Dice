@@ -127,7 +127,7 @@ export async function log_on(ctx: Context, session: Session, name: any) {
         return "Norn_Dice.Log.错误信息_群聊"
     if (await isLogging(ctx, session.guildId))
         return "Norn_Dice.Log.错误信息_正在记录"
-        
+
     var log_name_lst = await ctx.database.get('group_logging_v2', { group_id: session.guildId }, ['log_name'])
 
     if (log_name_lst.length == 0)
@@ -164,6 +164,7 @@ export async function log_on(ctx: Context, session: Session, name: any) {
 
 // log end
 export async function log_end(ctx: Context, session: Session, name: any) {
+
     if (!session.guildId)
         return "Norn_Dice.Log.错误信息_群聊"
 
@@ -214,75 +215,99 @@ export async function log_end(ctx: Context, session: Session, name: any) {
 
     ws.end(async () => {
         var json = {}
-        // 群文件
-        await session.onebot.uploadGroupFile(session.guildId, path.join(file_path, name + ".txt"), name + ".txt")
-            .catch(async err => {
-                session.send("Norn_Dice.Log.错误信息_上传失败")
+
+        var isSuccess = false
+
+        // 检查适配器
+        if (session.platform == "onebot") {
+            await session.onebot.uploadGroupFile(session.guildId, path.join(file_path, name + ".txt"), name + ".txt")
+                .then(res => {
+                    isSuccess = true
+                })
+                .catch(err => {
+                    session.send("Norn_Dice.Log.错误信息_上传失败")
+                })
+        }
+
+        if (isSuccess)
+            return
 
 
-                var header = {}
-                var body = {}
 
-                // 定义文件
-                var file = fs.createReadStream(path.join(file_path, name + ".txt"))
+        // 准备文件上传
 
-                header = {
-                    headers: {
-                        "Content-Type": "multipart/form-data"
-                    }
-                }
-                body = {
-                    'file': file
-                }
+        var header = {}
+        var body = {}
 
-                // anonfiles
+        // 定义文件
+        var file = fs.createReadStream(path.join(file_path, name + ".txt"))
 
-                debug.info("starting upload anonfiles...")
-                var prom = await ctx.http.post('https://api.anonfiles.com/upload?token=699f404b4a263a65',
-                    body,
-                    header)
-                    .then((res) => {
-                        debug.info("succ")
+        header = {
+            headers: {
+                "Content-Type": "multipart/form-data"
+            }
+        }
+        body = {
+            'file': file
+        }
 
-                        json['said'] = "Norn_Dice.Log.上传到网络"
-                        json['url'] = res.data['data']['file']['url']['full']
-                        return true
-                    })
-                    .catch(async err => {
-                        debug.info("fail")
+        // 上传链接 
+        // 1 - anonfiles
+        if (!isSuccess) {
+            debug.info("starting upload anonfiles...")
 
-                        debug.info("starting upload file.io...")
+            await ctx.http.post('https://api.anonfiles.com/upload?token=699f404b4a263a65',
+                body,
+                header)
+                .then((res) => {
+                    debug.info("succ")
+                    debug.info(JSON.stringify(json))
+                    debug.info(JSON.stringify(res))
 
-                        // file.io
-                        await ctx.http.post('https://file.io/?expires=3d',
-                            body,
-                            header
-                        )
-                            .then((res) => {
-                                debug.info("succ")
+                    json['said'] = "Norn_Dice.Log.上传到网络"
+                    json['url'] = res["data"]["file"]["url"]["full"]
 
-                                debug.info(res)
+                    isSuccess = true
 
-                                json['said'] = "Norn_Dice.Log.上传到网络"
-                                json['url'] = res.link
+                    return true
+                })
+                .catch(async err => {
+                    debug.info("fail")
 
-                            })
-                            .catch(err => {
-                                debug.info("fail")
-                                debug.info(err)
+                })
+        }
 
-                                json['said'] = "Norn_Dice.Log.错误信息_上传网盘失败"
-                            })
-                    })
+        // 2 - file.io
+        if (!isSuccess) {
 
-            })
-            .finally(() => {
-                fs.rm(path.join(file_path, name + ".txt"),
-                    (err) => debug.info(err)
-                )
-                session.send(JSON.stringify(json))
-            })
-        // session.send(JSON.stringify(json))
+            debug.info("starting upload file.io...")
+
+            // file.io
+            await ctx.http.post('https://file.io/?expires=3d',
+                body,
+                header
+            )
+                .then((res) => {
+                    debug.info("succ")
+                    
+                    debug.info(JSON.stringify(json))
+                    debug.info(JSON.stringify(res))
+
+                    json['said'] = "Norn_Dice.Log.上传到网络"
+                    json['url'] = res.link
+
+                    return true
+
+                })
+                .catch(err => {
+                    debug.info("fail")
+                    debug.info(err)
+
+                    json['said'] = "Norn_Dice.Log.错误信息_上传网盘失败"
+                })
+        }
+
+        session.send(JSON.stringify(json))
     })
 
 }

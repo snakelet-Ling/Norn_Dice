@@ -13,7 +13,7 @@ export { Config }
 
 const log_send = new Logger("Bot：")
 const debug = new Logger("debug")
-const version = "0.2.19"
+const version = "0.2.21"
 
 export let isHidden = false
 export let defaultOff = false
@@ -63,7 +63,8 @@ export function apply(ctx: Context, config: Config) {
 
     _.content
       = _.content
-        .replace(/&gt;;|&amp;gt;/g, ">")
+        .replace(/&gt;;|&amp;gt;|&gt;/g, ">")
+        .replace(/&lt;/g, "<")
         .replace(/\\n/g, "\n")
 
     // {SPLIT}

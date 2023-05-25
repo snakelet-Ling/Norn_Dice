@@ -294,7 +294,36 @@ export async function log_end(ctx: Context, session: Session, name: any) {
                     debug.info(JSON.stringify(res))
 
                     json['said'] = "Norn_Dice.Log.上传到网络"
-                    json['url'] = res.link
+                    json['url'] = res["link"]
+
+                    isSuccess = true
+
+                    return true
+
+                })
+                .catch(err => {
+                    debug.info("fail")
+                })
+        }
+
+        // 3 - fileDoge
+        if (!isSuccess) {
+
+            debug.info("starting upload fileDoge...")
+
+            // file.io
+            await ctx.http.post('https://api.filedoge.com/upload',
+                body,
+                header
+            )
+                .then((res) => {
+                    debug.info("succ")
+                    
+                    debug.info(JSON.stringify(json))
+                    debug.info(JSON.stringify(res))
+
+                    json['said'] = "Norn_Dice.Log.上传到网络"
+                    json['url'] = "https://filedoge.com/download/" + res["token"]
 
                     return true
 
@@ -353,8 +382,8 @@ async function keepLogging(ctx: Context, session: Session, log_name: string, log
         ctx.database.create('group_logging_data_v2', { data_id: log_id, date: new Date(), from: "(" + _.userId + ")" + _.username, message: _.content })
 
         if (_.content.search(reg) != -1) {
-            if (_.content.replace(reg, "").match(/logoff|log off/)
-                || _.content.replace(reg, "").match(/logend|log end/)
+            if (_.content.replace(reg, "").match(/logoff|log off|log.off/)
+                || _.content.replace(reg, "").match(/logend|log end|log.end/)
             ) {
                 sending()
                 logging()

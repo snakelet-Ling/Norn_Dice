@@ -253,29 +253,29 @@ export async function log_end(ctx: Context, session: Session, name: any) {
 
         // 上传链接 
         // 1 - anonfiles
-        if (!isSuccess) {
-            debug.info("starting upload anonfiles...")
+        // if (!isSuccess) {
+        //     debug.info("starting upload anonfiles...")
 
-            await ctx.http.post('https://api.anonfiles.com/upload?token=699f404b4a263a65',
-                body,
-                header)
-                .then((res) => {
-                    debug.info("succ")
-                    debug.info(JSON.stringify(json))
-                    debug.info(JSON.stringify(res))
+        //     await ctx.http.post('https://api.anonfiles.com/upload?token=699f404b4a263a65',
+        //         body,
+        //         header)
+        //         .then((res) => {
+        //             debug.info("succ")
+        //             debug.info(JSON.stringify(json))
+        //             debug.info(JSON.stringify(res))
 
-                    json['said'] = "Norn_Dice.Log.上传到网络"
-                    json['url'] = res["data"]["file"]["url"]["full"]
+        //             json['said'] = "Norn_Dice.Log.上传到网络"
+        //             json['url'] = res["data"]["file"]["url"]["full"]
 
-                    isSuccess = true
+        //             isSuccess = true
 
-                    return true
-                })
-                .catch(async err => {
-                    debug.info("fail")
+        //             return true
+        //         })
+        //         .catch(async err => {
+        //             debug.info("fail")
 
-                })
-        }
+        //         })
+        // }
 
         // 2 - file.io
         if (!isSuccess) {
@@ -375,7 +375,8 @@ async function keepLogging(ctx: Context, session: Session, log_name: string, log
     await ctx.database.set('group_logging_v2', { id: log_id }, { last_call: new Date })
 
     const sending = ctx.guild(session.guildId).on('before-send', (_) => {
-        ctx.database.create('group_logging_data_v2', { data_id: log_id, date: new Date, from: "(" + _.selfId + ")" + _.username, message: _.content })
+        if(session.platform != "kook")
+            ctx.database.create('group_logging_data_v2', { data_id: log_id, date: new Date, from: "(" + _.selfId + ")" + _.username, message: _.content })
     })
 
     const logging = ctx.guild(session.guildId).on('message', (_) => {

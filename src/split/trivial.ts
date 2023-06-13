@@ -1,6 +1,8 @@
-import { Context, Session } from "koishi"
+import { Context, Logger, Session } from "koishi"
 import { getCard, pc_skill_sugar, st_skill } from "./pc"
 import { isExpre, level_str, r_check, throw_roll } from "./roll"
+
+const debug = new Logger('debug')
 
 // 当前群设置
 interface group_setting {
@@ -144,13 +146,15 @@ export async function en(ctx: Context, session: Session, ...args) {
     var fail_exp = "0", succ_exp = "1d10"
 
     // 1个参数是技能
-    var prom = await getCard(ctx, session).then(res => res[1])
+    var prom_ = await getCard(ctx, session).then(res => res)
+    var prom = prom_[1]
+    json['player'] = prom_[0]
+    json['user'] = session.username
     var skill = args[0]
 
     // 取糖
     if (pc_skill_sugar[skill] != undefined)
         skill = pc_skill_sugar[skill]
-
 
     // 2个参数是技能 + 失败/成功
     if (args.length == 2) {
@@ -175,9 +179,6 @@ export async function en(ctx: Context, session: Session, ...args) {
     var org = Number.isNaN(Number(prom[skill])) ? 0 : prom[skill]
 
     json['org'] = org
-    var now = eval(org + "+" + exp)
-    json['now'] = now
-    json['skill'] = skill
 
     // 开始检定
     var rules = await rules_get(ctx, session).then(res => res)
@@ -191,14 +192,18 @@ export async function en(ctx: Context, session: Session, ...args) {
     var said = session.text("Norn_Dice.投掷.成长检定.检定句子", json)
 
     // 成功失败加值
-    var said_v2 = "", exp
-    if(passLv == level_str.大失败 || passLv == level_str.失败){
+    var said_v2 = "", exp, now
+    if(!(passLv == level_str.大失败 || passLv == level_str.失败)){
         if(isExpre(fail_exp))
             exp = await throw_roll(ctx, session, fail_exp).then(res => res.result)
         else
             exp = fail_exp
 
         json['exp'] = fail_exp + " = " + exp
+
+        now = eval(org + "+" + exp)
+
+        json['now'] = now
 
         said_v2 = session.text("Norn_Dice.投掷.成长检定.检定失败", json)
     }else{
@@ -209,9 +214,14 @@ export async function en(ctx: Context, session: Session, ...args) {
             
         json['exp'] = succ_exp + " = " + exp
 
+        now = eval(org + "+" + exp)
+
+        json['now'] = now
+
         said_v2 = session.text("Norn_Dice.投掷.成长检定.成功通过", json)
     }
 
+    json['skill'] = skill
     said += said_v2
 
     // 存入数据库

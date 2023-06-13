@@ -153,6 +153,14 @@ export function coc(ctx: Context, config: Config) {
             return
         }
 
+        // coc
+        if (message.match(/^coc(\d+)/)) {
+            var args = message.match(/coc(\d+)/)
+            // _.send(await cocset(ctx, _, args[1]))
+            _.send(await coc_chara(_, Number(args[1])).then(res => res))
+            return
+        }
+
         // set
         if (message.match(/^set(\d+)/)) {
             var args = message.match(/^set(\d+)/)
@@ -253,12 +261,12 @@ export function coc(ctx: Context, config: Config) {
         .example("mp-3\n")
 
         .action((_, ...args) => {
-            if (args.length == 2 || args[0] == ("show")) {
+            if (args.length == 2 && args[0] == ("show")) {
                 return st_show(ctx, _.session, args[1])
             } else if (args[0].match(/^show(.*)/)) {
                 return
-            } else {
-                return st_skill(ctx, _.session, args[0])
+            }else {
+                return st_skill(ctx, _.session, args.join(""))
             }
         })
 
@@ -268,7 +276,9 @@ export function coc(ctx: Context, config: Config) {
         .example("st show str")
         .example("st show 力量")
 
-        .action((_, name) => st_show(ctx, _.session, name))
+        .action((_, name) => {
+            return st_show(ctx, _.session, name)
+        })
 
     // 
     // 

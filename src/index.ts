@@ -13,7 +13,7 @@ export { Config }
 
 const log_send = new Logger("Bot：")
 const debug = new Logger("debug")
-const version = "0.2.26"
+const version = "0.2.27"
 
 export let isHidden = false
 export let defaultOff = false

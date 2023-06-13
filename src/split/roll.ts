@@ -142,8 +142,6 @@ function exp2self(exp) {
     exp = exp.replace(/(\D+)[dD](\d+)/g, "$1" + "1d$2")
         .replace(/(\d+)D(\d+)/g, "$1d$2")
 
-    debug.info(exp)
-
     var middle = []
 
     var ex = exp.match(/(\d+)#(\d+)d(\d+)/)
@@ -171,7 +169,6 @@ function exp2self(exp) {
     }
 
     var said = { middle: middle, result: Number(eval(exp)), reason: '', exp: '' }
-    debug.info(said)
     return said
 }
 
@@ -406,18 +403,35 @@ export async function rh(ctx: Context, session: Session, who?: string) {
 
 // 奖励/惩罚检定
 export async function r_check_bouns_punish(ctx: Context, session: Session, isBouns: boolean, ...args) {
+    var reason, target_str, bp
+
     if (args.length == 0)
         return "Norn_Dice.投掷.错误_检定无参"
 
     // 一个奖励骰，参数是检定项目
-    else if (args.length == 1 || Number.isNaN(Number(args[0]))) {
-        var bp = bouns_punish(isBouns, 1)
-        var target_str = args[0]
+    else if (args.length == 1) {
+        bp = bouns_punish(isBouns, 1)
+        target_str = args[0]
 
-        // args[0]个奖励骰，args[1]是检定项目
+        // 第一个参数是否文字
+    } else if(args.length == 2 ) {
+        // 是文字，则[0]是理由，[1]是目标
+        if(!Number.isInteger(args[0])) {
+            bp = bouns_punish(isBouns, 1)
+            reason = args[0]
+            target_str = args[1]
+
+            // 否则[0]是奖励骰数量，[1]是目标
+        }else{
+            bp = bouns_punish(isBouns, Number(args[0]))
+            target_str = args[1]
+        }
+
+        // args[0]个奖励骰，args[1]是理由，args[2]是检定项目
     } else {
-        var bp = bouns_punish(isBouns, Number(args[0]))
-        var target_str = args[1]
+        bp = bouns_punish(isBouns, Number(args[0]))
+        reason = args[1]
+        target_str = args[2]
     }
 
     // 获取房规
@@ -439,12 +453,14 @@ export async function r_check_bouns_punish(ctx: Context, session: Session, isBou
 
     var pass = pass_check(rules, bp.lastNum, target)
 
-    // args[2] = reson，可空，空则由target_str顶上
+    // reason可空，空则由target_str顶上
+
+    debug.info(reason)
 
     var json = {
         'bp': bp,
         'passLv': pass,
-        'reason': (args[2] == undefined ? target_str : args[2]),
+        'reason': (reason == null ? target_str : reason),
         'target': target
     }
 

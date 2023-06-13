@@ -1,5 +1,7 @@
-import { Context, Session } from "koishi"
+import { Context, Logger, Session } from "koishi"
 import { isExpre, throw_roll } from "./roll"
+
+const debug = new Logger("debug");
 
 // pc列表
 interface pc_data {
@@ -411,6 +413,8 @@ export async function st_show(ctx: Context, session: Session, name: string) {
 export async function st_skill(ctx: Context, session: Session, skill: string) {
     // var config = getConfig()
 
+    debug.info(skill)
+    
     // 技能走前头哦
     if (Number.parseInt(skill[0]) + "" != "NaN")
         return "指令错误！请使用 st 指令查看帮助示例。"

@@ -74,7 +74,9 @@ export function coc(ctx: Context, config: Config) {
 
             args[1] = args[1].trim()
 
-            args_ = args[1].match(/^(\d*) *(.*)/)
+            args_ = args[1].match(/^(\d*).(.*)/)
+
+            // debug.info(args_[1]+", "+args_[2])
 
             _.send(await roll_check_bouns(ctx, r_check_bouns_punish(ctx, _, isBouns, args_[1], args_[2]), _))
             return
@@ -514,7 +516,7 @@ async function roll(ctx: Context, session: Session, prom) {
     //     }
 
     // 替换详情
-    if (res.middle.length <= 1) {
+    if (res.middle.length <= 1 && res.middle[0]['res'].indexOf(",") == -1) {
         json['resultDetail'] = ""
 
     } else {
@@ -526,6 +528,8 @@ async function roll(ctx: Context, session: Session, prom) {
             arr += "[" + e.exp + "] = [" + e.res + "]"
         });
         json['resultDetail'] = arr + "\n"
+
+        debug.info(json['resultDetail'])
     }
 
     json['result'] = res.result
@@ -606,7 +610,7 @@ async function roll_check_bouns(ctx: Context, json_prom, session: Session) {
     //             .replace("{resultDetail}", resultDetail)
     //             .replace("{result}", bp.lastNum + "/" + json.target)
     said_json['reason'] = (json.reason == undefined ? "" : json.reason)
-    said_json['exp'] = "b" + json.bp.ten.length
+    said_json['exp'] = (bp.isBouns ? "b" : "p") + json.bp.ten.length
     said_json['resultDetail'] = resultDetail
     said_json['result'] = bp.lastNum + "/" + json.target
 
@@ -635,7 +639,9 @@ async function bouns_roll(ctx: Context, session: Session, res) {
 
     detail += res['ten'].join(" ") + " ]"
 
-    exp = "b" + res['ten'].length
+    debug.info(res)
+
+    exp = (res['isBouns'] ? "b" :"p") + res['ten'].length
 
     json['said'] = said
     json['resultDetail'] = detail

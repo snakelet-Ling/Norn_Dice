@@ -6,6 +6,7 @@ import name_en from "../json/name_en.json"
 import name_zh from "../json/name_zh.json"
 import name_jp from "../json/name_jp.json"
 import { getCard } from "./pc"
+import { chara_split_num } from ".."
 
 export function ti_li(isTi: boolean) {
 
@@ -59,7 +60,7 @@ export async function coc_chara(session, num: number) {
         said += " HP" + Math.floor((json['体质'] + json['体型']) / 10)
         said += " 总和[" + (sum - json['幸运']) + "/" + sum + "]"
 
-        if ((i + 1) % 5 == 0) {
+        if ((i + 1) % chara_split_num == 0) {
             said += "{SPLIT}"
         } else {
             said += "\n"

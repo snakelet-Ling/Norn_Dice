@@ -13,15 +13,17 @@ export { Config }
 
 const log_send = new Logger("Bot：")
 const debug = new Logger("debug")
-const version = "0.2.27"
+const version = "0.2.29"
 
 export let isHidden = false
 export let defaultOff = false
+export let chara_split_num = 5
 
 export function apply(ctx: Context, config: Config) {
 
   isHidden = config.hidden_command
   defaultOff = config.open_default
+  chara_split_num = config.split_coc
 
   ctx.plugin(coc)
   ctx.i18n.define("zh", require('./locales/zh'))

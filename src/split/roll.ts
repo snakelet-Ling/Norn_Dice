@@ -416,7 +416,7 @@ export async function r_check_bouns_punish(ctx: Context, session: Session, isBou
         // 第一个参数是否文字
     } else if(args.length == 2 ) {
         // 是文字，则[0]是理由，[1]是目标
-        if(!Number.isInteger(args[0])) {
+        if(Number.isNaN(Number.parseInt(args[0]))) {
             bp = bouns_punish(isBouns, 1)
             reason = args[0]
             target_str = args[1]
@@ -455,8 +455,6 @@ export async function r_check_bouns_punish(ctx: Context, session: Session, isBou
 
     // reason可空，空则由target_str顶上
 
-    debug.info(reason)
-
     var json = {
         'bp': bp,
         'passLv': pass,
@@ -472,8 +470,8 @@ export function bouns_punish(isBouns: boolean, num: number) {
     var ten: number[] = []
     var unit = 0
 
-    ten.push(r_single(10))
-    unit = r_single(10)
+    ten.push(r_single(10)-1)
+    unit = r_single(10)-1
 
     // 无参纠正
     if (Number.isNaN(num) || num <= 0)
@@ -481,7 +479,7 @@ export function bouns_punish(isBouns: boolean, num: number) {
 
     // 骰摘十位数
     for (let i = 0; i < num; i++)
-        ten.push(r_single(10))
+        ten.push(r_single(10)-1)
 
     // 分开奖励/惩罚
     if (isBouns) {

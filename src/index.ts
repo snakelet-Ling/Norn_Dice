@@ -67,6 +67,7 @@ export function apply(ctx: Context, config: Config) {
       = _.content
         .replace(/&gt;;|&amp;gt;|&gt;/g, ">")
         .replace(/&lt;;|&amp;lt;|&lt;/g, "<")
+        .replace(/&amp;/g, "&")
         .replace(/\\n/g, "\n")
 
     // {SPLIT}

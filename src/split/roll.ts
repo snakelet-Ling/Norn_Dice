@@ -384,8 +384,8 @@ export async function rh(ctx: Context, session: Session, who?: string) {
         var prom = await session.bot.getGuildMember(session.guildId, qq[1]).then(res => res)
         // 解析
         //  var nick = prom.nickname == "" ? prom.username : prom.nickname
-        var nick = prom.nick == "" ? prom.user : prom.nick
-        var card = await getCard_who(ctx, /** prom.userId */session.guildId, session.guildId).then(res => res)
+        var nick = prom.user.nick == "" ? prom.user.name : prom.user.nick
+        var card = await getCard_who(ctx, /** prom.userId */prom.user.id, session.guildId).then(res => res)
         var num = card[1]["心理学"]
 
         var resu = r_check(num, rules)

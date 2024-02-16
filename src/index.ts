@@ -1,6 +1,6 @@
 import { Context, Logger, sleep } from 'koishi'
 
-import { } from '@koishijs/plugin-adapter-onebot'
+import { } from 'koishi-plugin-adapter-onebot'
 import { Config } from './config/config'
 import { coc } from './module/coc'
 import group_set, { bot_off_on } from './split/trivial'

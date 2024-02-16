@@ -1,10 +1,12 @@
 {
   "name": "@snakelet/koishi-plugin-norn-dice",
   "description": "蛇骰",
-  "version": "0.2.31",
+  "version": "0.2.32",
   "contributors": [
-    "Snake <1059648351@qq.com>"
+    "Snake <1059648351@qq.com>",
+    "jingming295 <jingming295@gmail.com>"
   ],
+  "homepage": "https://github.com/snakelet-Ling/Norn_Dice",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [

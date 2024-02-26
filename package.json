@@ -1,7 +1,7 @@
 {
   "name": "@snakelet/koishi-plugin-norn-dice",
   "description": "蛇骰",
-  "version": "0.2.32",
+  "version": "0.2.33",
   "contributors": [
     "Snake <1059648351@qq.com>",
     "jingming295 <jingming295@gmail.com>"
@@ -23,6 +23,7 @@
     "蛇骰"
   ],
   "peerDependencies": {
-    "koishi": "^4.11.6"
+    "koishi": "^4.16.8",
+    "koishi-plugin-adapter-onebot": "^6.4.0"
   }
 }

@@ -8,14 +8,17 @@ import { san_check } from "../split/sc";
 import { coc_chara, draw_name, ti_li } from "../split/draw";
 import group_log, { log_end, log_list, log_new, log_off, log_on } from "../split/log";
 import { Config } from "../config/config";
-import { defaultOff, isHidden } from "..";
 export const name = "coc"
 
 const log_catch = new Logger("")
 const debug = new Logger("debug")
 
-export function coc(ctx: Context, config: Config) {
+let isHidden = false
+let defaultOff = false
 
+export function coc(ctx: Context, config: Config) {
+    isHidden = config.hidden_command
+    defaultOff = config.open_default
     // 前缀拼凑
     var reg = getPrefixReg(ctx)
 
@@ -23,20 +26,25 @@ export function coc(ctx: Context, config: Config) {
     ctx.on('message', async (_) => {
 
         // 日志输出
-        log_catch.info((_.guildId == undefined ? "personal" : _.guildId) + " => " + _.username + "(" + _.userId + ") : \n" + _.content)
+        // log_catch.info((_.guildId == undefined ? "personal" : _.guildId) + " => " + _.username + "(" + _.userId + ") : \n" + _.content)
 
         var message = ""
 
         // 有艾特，不是自己，走
         var ele = _.elements
+        // console.log(ele)
         if (ele.length > 1) {
             if (ele[0].type == 'at' && ele[0].attrs.id != _.selfId)
                 return
-
-            message = ele[1].attrs.content.trim()
+            if(ele[1].attrs.content){
+                message = ele[1].attrs.content.trim()
+            }   
 
         } else {
-            message = ele[0].attrs.content.trim()
+            if(ele[0].attrs.content){
+                message = ele[0].attrs.content.trim()
+            }
+            
 
             // 检测关闭
             if (!message.match(/^bot(on|off)/)) {
@@ -396,11 +404,11 @@ export function coc(ctx: Context, config: Config) {
     // 
     ctx.command("ti", "临时症状", { hidden: isHidden })
         .usage("临时疯狂 - 短期症状")
-        .action(() => ti_li(true))
+        .action(() => ti_li(true, config))
 
     ctx.command("li", "总结症状", { hidden: isHidden })
         .usage("临时疯狂 - 长期症状")
-        .action(() => ti_li(false))
+        .action(() => ti_li(false, config))
 
     ctx.command("coc [num: number]", "COC人物作成", { hidden: isHidden })
         .option('num', "生成数量，默认1")

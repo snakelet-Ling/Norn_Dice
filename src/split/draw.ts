@@ -6,10 +6,12 @@ import name_en from "../json/name_en.json"
 import name_zh from "../json/name_zh.json"
 import name_jp from "../json/name_jp.json"
 import { getCard } from "./pc"
-import { chara_split_num } from ".."
+import { Config } from ".."
 
-export function ti_li(isTi: boolean) {
+let chara_split_num = 5
 
+export function ti_li(isTi: boolean, config:Config) {
+    chara_split_num = config.split_coc
     var said = isTi ? "临时症状：\n" : "总结症状：\n"
     if (isTi) {
         said += scJson.ti[Random.int(0, scJson.ti.length)]

@@ -20,8 +20,7 @@ export async function san_check(ctx: Context, session: Session, ...args) {
 
         args.unshift(san)
     }
-
-    // 表达式检测
+    if(!args[1]) return "Norn_Dice.投掷.理智检定.错误_表达式错误"
     var exp = JSON.stringify(args[1]).replace(/"/g, "").split("/")
     if (exp.length != 2)
         return "Norn_Dice.投掷.理智检定.错误_表达式错误"
